@@ -30,11 +30,11 @@ fork_vs_upstream: 路径集合 = 上游 main + .github/workflows/build-app.yml
 | 1 | `ios-app/AnisetteServers.swift:15,27-40` | 16 个第三方 anisette 服务器，含明文 HTTP `http://5.249.163.88:6969`；默认 `https://ani.sidestore.io` | 会向第三方发送 anisette 数据（**不含密码**），第三方可关联你的 Apple ID 请求 |
 | 2 | `ios-app/Engine.swift:890-894` | 某台服务器失败后自动重试其它服务器 | 同上，暴露面被放大 |
 | 3 | `rust-core/src/apple_session.rs:247` | `tracing::info!("{label}: logging in {apple_id}")` 明文记录完整 Apple ID | 日志/控制台可见 Apple ID（上游新版本用 `censor_email` 打码） |
-| 4 | `SideInstallerDNS.mobileconfig:18` | 全量 DNS 走 `https://apple.dns.nextdns.io/73f83a/SideInstaller` | 第三方 DNS 可观测你全部域名；**只有用证书池那条路才需要它**，自签方案不需要 |
+| 4 | `SideInstallerDNS.mobileconfig:18` | 全量 DNS 走 `https://apple.dns.nextdns.io/73f83a/SideInstaller` | 第三方 DNS 可观测你全部域名；**只有用证书池那条路才需要它**，自签方案不需要（该文件已退役） |
 | 5 | `rust-core/Cargo.toml:76` | `isideload` 依赖指向 git 分支，未 pin | 供应链风险；已被 `[patch]` 段中和到固定 rev，但升级时要复核 |
-| 6 | `certs/HSBC Bank plc/*.p12` + `password.txt` | 公开仓库里提交了企业签名私钥 | **等同已泄露**（该证书已被吊销）。本次已从工作树删除；历史里仍在 → 按泄露处理 |
+| 6 | `certs/HSBC Bank plc/*.p12` + `password.txt` | 公开仓库里提交了企业签名私钥 | **等同已泄露**（该证书已被吊销）。已从工作树删除；历史里仍在 → 按泄露处理 |
 | 7 | `.claude/settings.local.json` | 含上游作者本机路径 `/Users/tommdadd/...` | 上游的信息泄露，无实际危害 |
-| 8 | `output/**`、`output-beta/**` | 1.05 GB 的 CI 重签产物 + 31 张吊销证书的 IPA | 无用负担；本次已退役 |
+| 8 | `output/**`、`output-beta/**` | 1.05 GB 的 CI 重签产物 + 31 张吊销证书的 IPA | 无用负担；已退役 |
 
 ## 3. vendor 差异（相对上游 pin，已逐行核对）
 
@@ -46,28 +46,43 @@ fork_vs_upstream: 路径集合 = 上游 main + .github/workflows/build-app.yml
 
 三处都是功能/调试/命名，**无恶意**。以后再动 `vendor/**` 必须逐行看。
 
-## 4. 本次退役（2026-09-21）
+## 4. 已退役（2026-09-21，两轮）
 
-已删除（工作树 + main）：
+第一轮（提交 `0ffded5`）：
 
 - `.github/workflows/sign-sideinstaller.yml`（企业证书池重签名 + 每周 cron）
 - `.github/workflows/plist-and-index.yml`（Pages 安装页发布）
 - `output/`、`output-beta/`、`build-dd/`、`certs/`（共 3162 个文件）
 
-已停用：GitHub Pages 站点。
+第二轮：只服务于已退役流水线的 13 个死文件（重签脚本、Pages 页面、证书池输入）
 
-保留：`.github/workflows/build-app.yml`（从源码编译未签名 IPA）、`build-siboot.yml`（上游）、`latest_version.txt`、`scripts/**`、`.github/workflows/build-app.yml` 所需的一切。
+- `scripts/sign_with_all_certs.sh`、`scripts/check_for_changes.sh`、`scripts/generate_index.sh`、`scripts/generate_plist.sh`
+- `scripts/template.html`、`scripts/template.html.orig`
+- `index.html`、`index.html.orig`、`beta.html`、`terms.html`
+- `cert-url.txt`、`ipa-url.txt`、`SideInstallerDNS.mobileconfig`
+
+另外：停用 GitHub Pages 站点；删除 fork 的 `v1.1.0` release 与 tag（tag 里是退役前的旧 workflow 文件）。
+
+保留：`.github/workflows/build-app.yml`（从源码编译未签名 IPA）、`build-siboot.yml`（上游构建检查）、`latest_version.txt`、`build-rust.sh`、`project.yml`、`scripts/audit-delta.sh`、`app-icon.png`（README 用）。
 
 两点必须知道：
 
 1. **上游仍在跟踪这些路径**，所以 `git merge upstream/main` 会把它们带回来。合并后要复退：
 
    ```sh
-   git rm -r --cached --ignore-unmatch output output-beta build-dd certs \
-       .github/workflows/sign-sideinstaller.yml .github/workflows/plist-and-index.yml
+   git rm -r --cached --ignore-unmatch \
+       output output-beta build-dd certs \
+       .github/workflows/sign-sideinstaller.yml .github/workflows/plist-and-index.yml \
+       index.html index.html.orig beta.html terms.html \
+       cert-url.txt ipa-url.txt SideInstallerDNS.mobileconfig \
+       scripts/sign_with_all_certs.sh scripts/check_for_changes.sh \
+       scripts/generate_index.sh scripts/generate_plist.sh \
+       scripts/template.html scripts/template.html.orig
    rm -rf output output-beta build-dd certs
    git commit -m "chore: re-retire upstream paths removed from this fork"
    ```
+
+   `scripts/audit-delta.sh` 的 §7 会检查这些路径有没有被带回来（单一来源：脚本里的 `RETIRED_RE`）。
 
 2. **历史里这些文件还在**，仓库体积不会因此变小。真瘦身必须改写历史 + force push，会彻底破坏与上游的合并关系，**不做**。
 
@@ -76,7 +91,7 @@ fork_vs_upstream: 路径集合 = 上游 main + .github/workflows/build-app.yml
 ### 🟢 免审（可直接放行，不用看 diff）
 
 - 只有 `*.md`、`CHANGELOG`、`NOTES`、文案、图片资源
-- `output*/`、`build-dd/`、`certs/`、两个已退役 workflow 的**删除**（复退）
+- 已退役路径的**删除**（复退）——见 §4 的路径清单
 - `project.yml` 的版本号/构建号、`latest_version.txt`
 - `rust-core/Cargo.lock` 同一版本线内的 patch/minor 升级（来源 crates.io）
 - `build-app.yml` 的缓存、版本、超时类改动
