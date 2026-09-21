@@ -129,10 +129,15 @@ fork_vs_upstream: 路径集合 = 上游 main + .github/workflows/build-app.yml
 
 - 上游没有新 release，或新 release 已经在 `main` 里 → 直接结束，**不构建**
 - 上游发了新版本 → 一次性处理**整个版本**：
-  1. 合并「`UPSTREAM-SYNCED.txt` 记录的版本 → 新 release tag」这一整段改动，并按 §4 自动复退
+  1. 把「`UPSTREAM-SYNCED.txt` 记录的版本 → 新 release tag」这一整段改动 **squash 成一个提交**（fork 不搬运上游那些 1GB 的 `output/*.ipa` 对象），并按 §4 自动复退
   2. 跑 `scripts/audit-version.sh <旧tag> <新tag> HEAD`，报告进 run 的 Summary + artifact
   3. 门禁通过 → 自动合并到 `main` → 调 `build-app` 出未签名 IPA（artifact）
   4. 门禁没过 → 推 `sync/upstream-<tag>` 分支 + 建 issue 附完整报告，等你点头
+
+两个省流量的细节（fork 历史里还躺着 3.3 GB）：
+
+- 克隆用 `filter=blob:limit=1m` + sparse-checkout 跳过退役目录，每天只拉几十 MB，不会去拉那 3.3 GB 历史
+- 审计范围自动排除 `output/`、`output-beta/`、`build-dd/`、`certs/`：上游每次重签都会改这批 ipa，不排除的话既会白拉几百 MB，又会把"上游又重签了一批证书"误报成危险信号
 
 状态文件 `UPSTREAM-SYNCED.txt` 记录已同步到的 tag / commit，由 workflow 自己更新。
 

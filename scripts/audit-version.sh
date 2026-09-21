@@ -7,7 +7,7 @@
 # 门禁只覆盖"可确定判定"的东西：新增的 URL/域名/IP、危险 API、凭据、依赖面、
 # workflow 权限与触发面、新增二进制、退役路径回流、变更规模。它**不**判断语义
 # （比如一个正常域名的服务端是不是恶意、一段纯逻辑改动有没有偷传数据），
-# 所以门禁通过 ≠ 审计通过，报告里的"门禁没查什么"一节要说清楚。
+# 所以门禁通过 ≠ 审计通过，报告最后一节固定列出"门禁没查什么"。
 set -uo pipefail
 
 PREV="${1:-}"
@@ -23,6 +23,10 @@ fi
 # 重签脚本、Pages 页面、证书池输入
 RETIRED_RE='^(output|output-beta|build-dd|certs)/|^\.github/workflows/(sign-sideinstaller|plist-and-index)\.yml$|^(index|beta|terms)\.html(\.orig)?$|^scripts/(sign_with_all_certs|check_for_changes|generate_index|generate_plist)\.sh$|^scripts/template\.html(\.orig)?$|^(cert-url|ipa-url)\.txt$|^SideInstallerDNS\.mobileconfig$'
 
+# 上游自己在跟踪的大目录：它们永远不进 main，也不参与版本审计（否则 diff 会去
+# 拉几百 MB 的 ipa，还会把"上游又重签了一批证书"误报成危险信号）
+EXC=(':(exclude)output/**' ':(exclude)output-beta/**' ':(exclude)build-dd/**' ':(exclude)certs/**')
+
 KEYWORDS='https?://|posix_spawn|dlopen|dlsym|NSTask|Process\(|system\(|popen|URLSession|URLRequest|CFNetwork|SecItem|Keychain|altIRK|atob\(|eval\(|-----BEGIN|password|passwd|secret|token|AKIA|ghp_|eyJ'
 MAX_FILES=300
 
@@ -34,12 +38,12 @@ git rev-parse --verify --quiet "${PREV}^{commit}" >/dev/null || { echo "未知 r
 git rev-parse --verify --quiet "${NEW}^{commit}" >/dev/null || { echo "未知 ref: $NEW" >&2; exit 1; }
 
 COMMITS=$(git rev-list --count "$PREV..$NEW" 2>/dev/null || echo 0)
-CHANGED=$(git diff --name-only "$PREV..$NEW" 2>/dev/null | wc -l | tr -d ' ')
+CHANGED=$(git diff --name-only "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | wc -l | tr -d ' ')
 
 echo "# 上游版本审计：\`$PREV\` → \`$NEW\`"
 echo
 echo "- 提交数：$COMMITS"
-echo "- 变更文件数：$CHANGED"
+echo "- 变更文件数：$CHANGED（已排除退役路径 \`output/\`、\`output-beta/\`、\`build-dd/\`、\`certs/\`）"
 echo "- 新版本 commit：\`$(git rev-parse --short "${NEW}^{commit}")\`"
 echo
 
@@ -53,7 +57,7 @@ echo
 echo "## 变更分布（按顶层目录）"
 echo
 echo '```'
-git diff --name-only "$PREV..$NEW" 2>/dev/null | sed 's|/.*||' | sort | uniq -c | sort -rn | head -25 || true
+git diff --name-only "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | sed 's|/.*||' | sort | uniq -c | sort -rn | head -25 || true
 echo '```'
 echo
 
@@ -66,7 +70,7 @@ if [ "$COMMITS" -eq 0 ]; then
 fi
 
 # 1) 关键词（只看新增行）
-HITS=$(git diff -U0 "$PREV..$NEW" 2>/dev/null \
+HITS=$(git diff -U0 "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null \
   | awk '/^\+\+\+ b\//{f=substr($0,7)} /^\+[^+]/{print f": "substr($0,2)}' \
   | grep -Ei "$KEYWORDS" || true)
 if [ -n "$HITS" ]; then
@@ -108,9 +112,9 @@ else
 fi
 
 # 5) 新增文件 / 二进制 / 可执行位
-ADDED=$(git diff --name-status --diff-filter=A "$PREV..$NEW" 2>/dev/null || true)
-BIN=$(git diff --numstat "$PREV..$NEW" 2>/dev/null | awk '$1=="-" && $2=="-" {print $3}' || true)
-EXEC=$(git diff --summary "$PREV..$NEW" 2>/dev/null | grep 'mode 100755' | head -10 || true)
+ADDED=$(git diff --name-status --diff-filter=A "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null || true)
+BIN=$(git diff --numstat "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | awk '$1=="-" && $2=="-" {print $3}' || true)
+EXEC=$(git diff --summary "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | grep 'mode 100755' | head -10 || true)
 if [ -n "$BIN" ]; then
   fail "新增/改动了二进制文件：$(printf '%s\n' "$BIN" | tr '\n' ' ')"
 else
@@ -174,7 +178,7 @@ echo
 echo "## 变更最大的 20 个文件"
 echo
 echo '```'
-git diff --stat "$PREV..$NEW" 2>/dev/null | tail -21 || true
+git diff --stat "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | tail -21 || true
 echo '```'
 echo
 

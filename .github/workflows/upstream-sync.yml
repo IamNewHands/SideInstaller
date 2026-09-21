@@ -1,11 +1,12 @@
 name: upstream-sync
 
-# 以「上游发版」为触发边界，不是按提交追。
+# 以「上游发版」为触发边界，不按提交追。
 #
-#   每天 11:00（北京时间）跑一次很轻的版本检查（几秒钟，ubuntu）
-#     └─ 上游没有新 release，或者新 release 已经在 main 里 → 直接结束，不构建
+#   每天 11:00（北京时间）跑一次很轻的版本检查（ubuntu，几秒）
+#     └─ 上游没有新 release，或这个版本已经同步过 → 直接结束，不构建
 #   上游发了新版本 →
-#     ├─ 合并「上一个 release → 新 release」这一整段改动，并自动复退已退役路径
+#     ├─ 把「上一个 release → 新 release」这一整段改动 squash 落到一个提交上
+#     │  （fork 不携带上游那些 1GB 的 output/*.ipa 对象），并自动复退已退役路径
 #     ├─ 对整段改动跑 scripts/audit-version.sh（门禁：新增 URL/危险 API/依赖面/
 #     │  workflow 权限/二进制/退役路径回流/规模）
 #     ├─ 门禁通过 → 自动合并到 main → 编译未签名 IPA（artifact）
@@ -13,7 +14,7 @@ name: upstream-sync
 #
 # 手动跑：Actions → upstream-sync → Run workflow
 #   tag     留空 = 上游最新 release
-#   base    留空 = UPSTREAM-SYNCED.txt 里记录的版本
+#   base    留空 = UPSTREAM-SYNCED.txt 里记录的版本（填了 base 就会强制审计这个范围）
 #   mode    auto = 门禁通过就合并（默认）/ review = 只审计不合并 / merge = 跳过门禁直接合并
 #   dry_run 只审计：不推送分支、不合并、不建 issue
 
@@ -56,10 +57,20 @@ jobs:
       tag: ${{ steps.plan.outputs.tag }}
       branch: ${{ steps.finish.outputs.branch }}
     steps:
+      # blob:limit=1m 跳过上游那些大文件（output/*.ipa 每个 8MB），sparse-checkout
+      # 让退役目录根本不落到工作区 —— 否则光是每天的克隆就要拉几个 GB。
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          filter: blob:limit=1m
+          sparse-checkout: |
+            /*
+            !/output/
+            !/output-beta/
+            !/build-dd/
+            !/certs/
+          sparse-checkout-cone-mode: false
 
       - name: 解析上游版本（轻检查）
         id: plan
@@ -72,27 +83,30 @@ jobs:
           echo "updated=false" >> "$GITHUB_OUTPUT"
 
           git remote add upstream https://github.com/FrizzleM/SideInstaller.git 2>/dev/null || true
-          git fetch --quiet --tags upstream
+          git fetch --quiet --tags --filter=blob:limit=1m upstream
 
           TAG="${IN_TAG:-$(gh api repos/FrizzleM/SideInstaller/releases/latest --jq .tag_name)}"
-          test -n "$TAG"
+          git rev-parse --verify --quiet "${TAG}^{commit}" >/dev/null || { echo "::error::上游没有 $TAG 这个 tag"; exit 1; }
 
-          BASE="${IN_BASE:-$(sed -n 's/^tag:[[:space:]]*//p' UPSTREAM-SYNCED.txt 2>/dev/null | tr -d '\r' | head -1)}"
-          if [ -z "$BASE" ]; then
-            BASE="$(gh api repos/FrizzleM/SideInstaller/releases --jq '.[1].tag_name')"
-          fi
-          echo "目标版本: $TAG   审计基准: $BASE"
+          STATE_TAG="$(sed -n 's/^tag:[[:space:]]*//p' UPSTREAM-SYNCED.txt 2>/dev/null | tr -d '\r' | head -1)"
 
-          if [ -z "$IN_BASE" ] && git merge-base --is-ancestor "${TAG}^{commit}" HEAD; then
-            echo "上游 $TAG 已经在 main 里，无需同步"
+          if [ -z "$IN_BASE" ] && [ "$TAG" = "$STATE_TAG" ]; then
+            echo "已经是 $TAG，无需同步（要看旧版本用 base 输入强制指定范围）"
             exit 0
           fi
 
+          BASE="${IN_BASE:-$STATE_TAG}"
+          if [ -z "$BASE" ] || ! git rev-parse --verify --quiet "${BASE}^{commit}" >/dev/null; then
+            BASE="$(git merge-base HEAD "${TAG}^{commit}")"
+            echo "状态文件不可用，改用 merge-base 作为审计基准"
+          fi
+
+          echo "目标版本: $TAG   审计基准: $BASE"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "base=$BASE" >> "$GITHUB_OUTPUT"
           echo "updated=true" >> "$GITHUB_OUTPUT"
 
-      - name: 合并上游版本 + 复退退役路径
+      - name: 应用上游版本 + 复退退役路径
         if: steps.plan.outputs.updated == 'true'
         env:
           TAG: ${{ steps.plan.outputs.tag }}
@@ -101,27 +115,37 @@ jobs:
           BRANCH="sync/upstream-${TAG}"
           echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
 
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B "$BRANCH"
-
-          git merge --no-commit --no-ff "${TAG}^{commit}" || true
-
           # 上游仍在跟踪这些路径，合并会把它们带回来 —— 一律按「删」处理
-          git rm -r -f --ignore-unmatch --quiet \
-            output output-beta build-dd certs \
+          RETIRED="output output-beta build-dd certs \
             .github/workflows/sign-sideinstaller.yml .github/workflows/plist-and-index.yml \
             index.html index.html.orig beta.html terms.html \
             cert-url.txt ipa-url.txt SideInstallerDNS.mobileconfig \
             scripts/sign_with_all_certs.sh scripts/check_for_changes.sh \
             scripts/generate_index.sh scripts/generate_plist.sh \
-            scripts/template.html scripts/template.html.orig >/dev/null 2>&1 || true
+            scripts/template.html scripts/template.html.orig"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+
+          # squash：fork 只保留「上游这个版本的内容」，不搬运上游的历史对象
+          git merge --squash "${TAG}^{commit}" || true
+
+          git rm -r -f --ignore-unmatch --quiet $RETIRED >/dev/null 2>&1 || true
+          rm -rf output output-beta build-dd certs
+
+          LEFT_RETIRED="$(git ls-files -- $RETIRED || true)"
+          if [ -n "$LEFT_RETIRED" ]; then
+            echo "::error::退役路径没删干净，已停止：不推送、不合并"
+            printf '%s\n' "$LEFT_RETIRED"
+            exit 1
+          fi
 
           # fail-closed：退役路径之外的任何冲突都不自动处理
-          LEFT="$(git ls-files -u | awk '{print $4}' | sort -u || true)"
-          if [ -n "$LEFT" ]; then
+          LEFT_CONFLICT="$(git ls-files -u | awk '{print $4}' | sort -u || true)"
+          if [ -n "$LEFT_CONFLICT" ]; then
             echo "::error::合并冲突（不是退役路径），已停止：不推送、不合并"
-            printf '%s\n' "$LEFT"
+            printf '%s\n' "$LEFT_CONFLICT"
             exit 1
           fi
 
@@ -130,14 +154,11 @@ jobs:
             > UPSTREAM-SYNCED.txt
 
           git add -A
-          if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
-            git commit -q -m "sync: upstream ${TAG}" \
-              -m "整版本同步（${TAG}）+ 退役路径复退。审计报告见同一次 upstream-sync 运行的 Summary。"
-          elif ! git diff --cached --quiet; then
-            git commit -q -m "sync: upstream ${TAG}" \
-              -m "退役路径复退 / 状态文件更新（${TAG}）。审计报告见同一次 upstream-sync 运行的 Summary。"
-          else
+          if git diff --cached --quiet; then
             echo "没有需要提交的改动（$TAG 的内容已经在 main 里）"
+          else
+            git commit -q -m "sync: upstream ${TAG}" \
+              -m "整版本同步（${TAG}，squash）+ 退役路径复退。审计报告见同一次 upstream-sync 运行的 Summary。"
           fi
           git --no-pager log --oneline -3
 
