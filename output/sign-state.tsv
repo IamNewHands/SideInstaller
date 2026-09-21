@@ -2,7 +2,7 @@
 # Written by the last full run and compared before the next one; the run
 # is skipped when this file would come out identical. Delete to force.
 channel	stable
-ipa_url	https://github.com/IamNewHands/SideInstaller/releases/download/v1.1.0/SideInstaller.ipa
+ipa_url	https://github.com/FrizzleM/SideInstaller/releases/download/v1.1.0/SideInstaller.ipa
 ipa_size	9252798
 output_base_url	https://raw.githubusercontent.com/IamNewHands/SideInstaller/main/output
 inputs_sha256	448e4579241719660ef7ff30fec0adc3dc1eb2c1ab6ccca63cd8e851543181fa
