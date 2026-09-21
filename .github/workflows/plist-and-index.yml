@@ -185,8 +185,14 @@ jobs:
           path: _site
 
   # Publishes the install page. Requires Settings -> Pages -> Source = "GitHub Actions".
+  #
+  # Branch refs only, for the same reason as in sign-sideinstaller: the
+  # github-pages environment rejects a tag deployment ("Tag ... is not allowed to
+  # deploy to github-pages"). This workflow has no tag trigger, so the guard only
+  # matters when it is dispatched by hand against a tag.
   deploy-pages:
     needs: build
+    if: github.ref_type == 'branch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
