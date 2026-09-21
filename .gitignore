@@ -12,3 +12,9 @@ xcuserdata/
 *.xcuserstate
 DerivedData/
 .DS_Store
+
+# Retired from this fork (upstream still tracks them; keep local artifacts untracked)
+/output/
+/output-beta/
+/build-dd/
+/certs/
