@@ -5,7 +5,7 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.." || exit 1
 
-BASE="${1:-$(sed -n 's/^audited_commit:[[:space:]]*//p' AUDIT-BASELINE.md | head -1)}"
+BASE="${1:-$(sed -n 's/^audited_commit:[[:space:]]*//p' AUDIT-BASELINE.md | tr -d '\r' | head -1)}"
 if [ -z "$BASE" ]; then
   echo "找不到水位线：AUDIT-BASELINE.md 里的 audited_commit" >&2
   exit 1

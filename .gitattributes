@@ -1,2 +1,4 @@
 # Keep shell scripts LF in the working tree (Git Bash / CI) regardless of core.autocrlf
 *.sh text eol=lf
+# The audit watermark is parsed with sed; keep it LF too
+AUDIT-BASELINE.md text eol=lf
