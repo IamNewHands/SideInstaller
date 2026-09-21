@@ -12,6 +12,9 @@ if [ -z "$BASE" ]; then
 fi
 TARGET="${2:-HEAD}"
 
+# 已退役路径（单一来源）：证书池目录、重签 workflow、重签脚本、Pages 页面、证书池输入
+RETIRED_RE='^(output|output-beta|build-dd|certs)/|^\.github/workflows/(sign-sideinstaller|plist-and-index)\.yml$|^(index|beta|terms)\.html(\.orig)?$|^scripts/(sign_with_all_certs|check_for_changes|generate_index|generate_plist)\.sh$|^scripts/template\.html(\.orig)?$|^(cert-url|ipa-url)\.txt$|^SideInstallerDNS\.mobileconfig$'
+
 echo "水位线 $BASE  ->  $TARGET"
 echo
 
@@ -44,6 +47,4 @@ git diff --name-status --diff-filter=A "$BASE..$TARGET" || true
 echo
 
 echo "== 7. 退役路径是否被带回来 =="
-git ls-tree -r --name-only "$TARGET" \
-  | grep -E '^(output|output-beta|build-dd|certs)/|^\.github/workflows/(sign-sideinstaller|plist-and-index)\.yml$' \
-  | head -20 || echo "（干净）"
+git ls-tree -r --name-only "$TARGET" | grep -E "$RETIRED_RE" | head -20 || echo "（干净）"
