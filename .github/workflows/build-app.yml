@@ -1,0 +1,137 @@
+name: build-app
+
+# Builds SideInstaller from this repository's own source and uploads the
+# unsigned IPA. This is the artifact this fork exists for: no enterprise
+# certificates, no re-signing, no install page. The IPA is signed by whoever
+# installs it (SideStore / AltStore on the device, with your own Apple ID), so
+# nothing here redistributes a build of the upstream project.
+#
+# Flow: sync upstream -> audit the diff -> run this -> install the IPA it
+# uploads. Run it from the Actions tab, or publish a release and the IPA is
+# attached to that release automatically.
+
+on:
+  workflow_dispatch:
+    inputs:
+      attach_tag:
+        description: "Attach the built IPA to this tag's release (blank = workflow artifact only)"
+        required: false
+        default: ""
+  release:
+    types: [published]
+
+permissions:
+  contents: write   # only used to attach the IPA to a release
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # build-rust.sh defaults DEVELOPER_DIR to /Applications/Xcode-beta.app,
+      # which does not exist on a runner. Pin both it and xcodebuild to whatever
+      # Xcode this image ships.
+      - name: Select the toolchain
+        run: |
+          set -euo pipefail
+          DEVELOPER="$(xcode-select -p)"
+          echo "DEVELOPER_DIR=$DEVELOPER" >> "$GITHUB_ENV"
+          xcodebuild -version
+          echo "iOS SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+          rustc --version
+          cargo --version
+
+      - name: Add the Rust iOS targets
+        run: |
+          set -euo pipefail
+          rustup target add aarch64-apple-ios aarch64-apple-ios-sim
+          rustup target list --installed | grep apple-ios
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust-core/target
+          key: app-rust-${{ runner.os }}-${{ hashFiles('rust-core/Cargo.lock') }}
+          restore-keys: app-rust-${{ runner.os }}-
+
+      - name: Build the Rust FFI (SideInstallerFFI.xcframework)
+        run: ./build-rust.sh
+
+      - name: Generate the Xcode project from project.yml
+        run: |
+          set -euo pipefail
+          command -v xcodegen >/dev/null 2>&1 || brew install xcodegen
+          xcodegen generate
+
+      - name: Build the app (Release, unsigned)
+        run: |
+          set -euo pipefail
+          # project.yml pins MARKETING_VERSION at 0.9.0; the repository's own
+          # latest_version.txt is what the update checker compares against, so
+          # the build is labelled from there instead.
+          VERSION="$(tr -d ' \r\n' < latest_version.txt)"
+          test -n "$VERSION"
+          echo "MARKETING_VERSION=$VERSION" >> "$GITHUB_ENV"
+          xcodebuild build \
+            -project SideInstaller.xcodeproj \
+            -scheme SideInstaller \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build-dd \
+            MARKETING_VERSION="$VERSION" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            2>&1 | tee xcodebuild.log | tail -n 40
+
+      - name: Package the IPA
+        run: |
+          set -euo pipefail
+          APP="build-dd/Build/Products/Release-iphoneos/SideInstaller.app"
+          test -d "$APP" || { echo "::error::no app bundle at $APP"; exit 1; }
+          IPA="SideInstaller-${MARKETING_VERSION}-unsigned.ipa"
+          echo "IPA=$IPA" >> "$GITHUB_ENV"
+          rm -rf Payload "$IPA"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry "$IPA" Payload
+          ls -lh "$IPA"
+
+      - name: Verify the IPA
+        run: |
+          set -euo pipefail
+          unzip -l "$IPA" | head -n 15
+          plutil -p Payload/SideInstaller.app/Info.plist \
+            | grep -E 'CFBundleShortVersionString|CFBundleIdentifier|MinimumOSVersion'
+          lipo -info Payload/SideInstaller.app/SideInstaller
+          codesign -dv Payload/SideInstaller.app 2>&1 || echo "(unsigned, as intended)"
+
+      - name: Upload the IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideInstaller-unsigned-ipa
+          path: ${{ env.IPA }}
+          if-no-files-found: error
+
+      - name: Attach the IPA to a release
+        if: github.event_name == 'release' || github.event.inputs.attach_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ github.event.inputs.attach_tag }}
+        run: |
+          set -euo pipefail
+          if [[ "${EVENT_NAME}" == "release" ]]; then
+            TAG="${RELEASE_TAG}"
+          else
+            TAG="${INPUT_TAG}"
+          fi
+          test -n "$TAG"
+          gh release upload "$TAG" "$IPA" --clobber -R "$GITHUB_REPOSITORY"
