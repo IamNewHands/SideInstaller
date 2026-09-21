@@ -54,6 +54,13 @@ permissions:
   pages: write      # publish the install page to GitHub Pages
   id-token: write   # required by actions/deploy-pages
 
+# The unsigned IPA is read from the upstream project's own release asset rather
+# than a copy hosted here: re-hosting an Official Release is redistribution
+# (LICENSE.md §3.2). resolve_unsigned_ipa_url() honours RELEASE_REPO, so the
+# release lookup follows this instead of GITHUB_REPOSITORY.
+env:
+  RELEASE_REPO: FrizzleM/SideInstaller
+
 jobs:
   sign:
     runs-on: macos-latest
@@ -159,9 +166,12 @@ jobs:
         if: steps.precheck.outputs.skip != 'true'
         env:
           # Points the page's "Download IPA" button at the overridden build when
-          # this run was dispatched with one; blank leaves it on the latest release.
+          # this run was dispatched with one; blank leaves it on the latest
+          # release — upstream's, not a re-hosted copy here.
           UNSIGNED_IPA_URL: ${{ github.event.inputs.ipa_url }}
-        run: ./scripts/generate_index.sh
+        run: |
+          export LATEST_RELEASE_URL="${UNSIGNED_IPA_URL:-https://github.com/${RELEASE_REPO}/releases/latest/download/SideInstaller.ipa}"
+          ./scripts/generate_index.sh
 
       # Commit the state the precheck computed, not a fresh one, so next week's
       # comparison is against exactly the inputs this page was built from.
