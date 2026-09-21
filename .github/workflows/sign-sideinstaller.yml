@@ -230,9 +230,14 @@ jobs:
   # (one-time). This job is what shows up in the Actions tab as the Pages deploy.
   # It is skipped entirely when the precheck found nothing to rebuild, which
   # leaves the current deployment serving as-is.
+  #
+  # Branch refs only. A release or tag push runs this workflow on the tag ref,
+  # and the github-pages environment rejects a tag deployment ("Tag ... is not
+  # allowed to deploy to github-pages"). The sign job still commits the refreshed
+  # files to the default branch in that case, so the next main run deploys them.
   deploy-pages:
     needs: sign
-    if: needs.sign.outputs.skipped != 'true'
+    if: needs.sign.outputs.skipped != 'true' && github.ref_type == 'branch'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
