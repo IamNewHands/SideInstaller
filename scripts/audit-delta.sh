@@ -3,7 +3,7 @@
 # 用法：bash scripts/audit-delta.sh [基线commit] [目标ref]
 set -uo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 BASE="${1:-$(sed -n 's/^audited_commit:[[:space:]]*//p' AUDIT-BASELINE.md | head -1)}"
 if [ -z "$BASE" ]; then
