@@ -1,0 +1,234 @@
+name: upstream-sync
+
+# 以「上游发版」为触发边界，不是按提交追。
+#
+#   每天 11:00（北京时间）跑一次很轻的版本检查（几秒钟，ubuntu）
+#     └─ 上游没有新 release，或者新 release 已经在 main 里 → 直接结束，不构建
+#   上游发了新版本 →
+#     ├─ 合并「上一个 release → 新 release」这一整段改动，并自动复退已退役路径
+#     ├─ 对整段改动跑 scripts/audit-version.sh（门禁：新增 URL/危险 API/依赖面/
+#     │  workflow 权限/二进制/退役路径回流/规模）
+#     ├─ 门禁通过 → 自动合并到 main → 编译未签名 IPA（artifact）
+#     └─ 需要人看 → 推同步分支 + 建 issue 附完整报告，等你点头
+#
+# 手动跑：Actions → upstream-sync → Run workflow
+#   tag     留空 = 上游最新 release
+#   base    留空 = UPSTREAM-SYNCED.txt 里记录的版本
+#   mode    auto = 门禁通过就合并（默认）/ review = 只审计不合并 / merge = 跳过门禁直接合并
+#   dry_run 只审计：不推送分支、不合并、不建 issue
+
+on:
+  schedule:
+    - cron: "0 3 * * *"   # 03:00 UTC = 11:00 北京时间
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "上游 release tag（留空 = 最新）"
+        required: false
+        default: ""
+      base:
+        description: "审计基准 ref（留空 = UPSTREAM-SYNCED.txt 记录的版本）"
+        required: false
+        default: ""
+      mode:
+        description: "auto=门禁通过就合并 / review=只审计 / merge=跳过门禁直接合并"
+        type: choice
+        options: [auto, review, merge]
+        default: auto
+      dry_run:
+        description: "只审计，不推送分支、不合并、不建 issue"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    outputs:
+      updated: ${{ steps.plan.outputs.updated }}
+      tag: ${{ steps.plan.outputs.tag }}
+      branch: ${{ steps.finish.outputs.branch }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: 解析上游版本（轻检查）
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IN_TAG: ${{ inputs.tag }}
+          IN_BASE: ${{ inputs.base }}
+        run: |
+          set -euo pipefail
+          echo "updated=false" >> "$GITHUB_OUTPUT"
+
+          git remote add upstream https://github.com/FrizzleM/SideInstaller.git 2>/dev/null || true
+          git fetch --quiet --tags upstream
+
+          TAG="${IN_TAG:-$(gh api repos/FrizzleM/SideInstaller/releases/latest --jq .tag_name)}"
+          test -n "$TAG"
+
+          BASE="${IN_BASE:-$(sed -n 's/^tag:[[:space:]]*//p' UPSTREAM-SYNCED.txt 2>/dev/null | tr -d '\r' | head -1)}"
+          if [ -z "$BASE" ]; then
+            BASE="$(gh api repos/FrizzleM/SideInstaller/releases --jq '.[1].tag_name')"
+          fi
+          echo "目标版本: $TAG   审计基准: $BASE"
+
+          if [ -z "$IN_BASE" ] && git merge-base --is-ancestor "${TAG}^{commit}" HEAD; then
+            echo "上游 $TAG 已经在 main 里，无需同步"
+            exit 0
+          fi
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "base=$BASE" >> "$GITHUB_OUTPUT"
+          echo "updated=true" >> "$GITHUB_OUTPUT"
+
+      - name: 合并上游版本 + 复退退役路径
+        if: steps.plan.outputs.updated == 'true'
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          set -euo pipefail
+          BRANCH="sync/upstream-${TAG}"
+          echo "BRANCH=$BRANCH" >> "$GITHUB_ENV"
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+
+          git merge --no-commit --no-ff "${TAG}^{commit}" || true
+
+          # 上游仍在跟踪这些路径，合并会把它们带回来 —— 一律按「删」处理
+          git rm -r -f --ignore-unmatch --quiet \
+            output output-beta build-dd certs \
+            .github/workflows/sign-sideinstaller.yml .github/workflows/plist-and-index.yml \
+            index.html index.html.orig beta.html terms.html \
+            cert-url.txt ipa-url.txt SideInstallerDNS.mobileconfig \
+            scripts/sign_with_all_certs.sh scripts/check_for_changes.sh \
+            scripts/generate_index.sh scripts/generate_plist.sh \
+            scripts/template.html scripts/template.html.orig >/dev/null 2>&1 || true
+
+          # fail-closed：退役路径之外的任何冲突都不自动处理
+          LEFT="$(git ls-files -u | awk '{print $4}' | sort -u || true)"
+          if [ -n "$LEFT" ]; then
+            echo "::error::合并冲突（不是退役路径），已停止：不推送、不合并"
+            printf '%s\n' "$LEFT"
+            exit 1
+          fi
+
+          printf 'tag: %s\ncommit: %s\nsynced_at: %s\n' \
+            "$TAG" "$(git rev-parse "${TAG}^{commit}")" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            > UPSTREAM-SYNCED.txt
+
+          git add -A
+          if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+            git commit -q -m "sync: upstream ${TAG}" \
+              -m "整版本同步（${TAG}）+ 退役路径复退。审计报告见同一次 upstream-sync 运行的 Summary。"
+          elif ! git diff --cached --quiet; then
+            git commit -q -m "sync: upstream ${TAG}" \
+              -m "退役路径复退 / 状态文件更新（${TAG}）。审计报告见同一次 upstream-sync 运行的 Summary。"
+          else
+            echo "没有需要提交的改动（$TAG 的内容已经在 main 里）"
+          fi
+          git --no-pager log --oneline -3
+
+      - name: 审计整个版本
+        id: audit
+        if: steps.plan.outputs.updated == 'true'
+        env:
+          TAG: ${{ steps.plan.outputs.tag }}
+          BASE: ${{ steps.plan.outputs.base }}
+        run: |
+          set +e
+          bash scripts/audit-version.sh "$BASE" "$TAG" HEAD > audit-report.md 2>&1
+          code=$?
+          set -e
+
+          { echo "## 上游版本审计 \`$BASE\` → \`$TAG\`"; echo; cat audit-report.md; } >> "$GITHUB_STEP_SUMMARY"
+
+          case "$code" in
+            0) echo "clean=true"  >> "$GITHUB_OUTPUT"; echo "门禁通过" ;;
+            2) echo "clean=false" >> "$GITHUB_OUTPUT"; echo "门禁有未通过项，需要人工" ;;
+            *)
+              echo "::warning::审计脚本退出码 $code，按「需要人工」处理"
+              { echo; echo "> 审计脚本退出码 $code（不是 0/2），按需要人工处理。"; } >> "$GITHUB_STEP_SUMMARY"
+              echo "clean=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+          head -50 audit-report.md
+
+      - name: 上传审计报告
+        if: steps.plan.outputs.updated == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-audit-report
+          path: audit-report.md
+          if-no-files-found: error
+
+      - name: 推送同步分支
+        if: steps.plan.outputs.updated == 'true' && inputs.dry_run != true
+        run: |
+          set -euo pipefail
+          git push -u --force origin "$BRANCH"
+
+      - name: 收尾（合并到 main 或建 issue 等你）
+        id: finish
+        if: steps.plan.outputs.updated == 'true' && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+          BASE: ${{ steps.plan.outputs.base }}
+          CLEAN: ${{ steps.audit.outputs.clean }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          set -euo pipefail
+          MODE="${MODE:-auto}"
+
+          if [ "$MODE" = "merge" ] || { [ "$MODE" = "auto" ] && [ "$CLEAN" = "true" ]; }; then
+            git checkout main
+            git merge --ff-only "$BRANCH"
+            git push origin main
+            echo "branch=main" >> "$GITHUB_OUTPUT"
+            echo "已合并到 main（mode=$MODE，门禁 clean=$CLEAN）"
+          else
+            echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
+            {
+              echo "上游 \`$TAG\` 需要人工审计（基准 \`$BASE\`）。"
+              echo
+              echo "- 同步分支：\`$BRANCH\`（已推送，可直接构建/试装）"
+              echo "- 分支对比：https://github.com/$GITHUB_REPOSITORY/compare/main...$BRANCH"
+              echo "- 看完没问题就合并：Actions → upstream-sync → Run workflow，tag 填 \`$TAG\`，mode 选 \`merge\`"
+              echo
+              echo "---"
+              echo
+              cat audit-report.md
+            } > issue-body.md
+
+            EXISTING="$(gh issue list -R "$GITHUB_REPOSITORY" --state open --limit 50 \
+              --json title --jq '.[].title' | grep -F "上游 $TAG 需要人工审计" || true)"
+            if [ -n "$EXISTING" ]; then
+              echo "已有同名 issue，跳过创建"
+            else
+              gh issue create -R "$GITHUB_REPOSITORY" \
+                --title "上游 $TAG 需要人工审计（$BASE → $TAG）" \
+                --body-file issue-body.md
+            fi
+            echo "未合并：分支已推送，issue 已建"
+          fi
+
+  build:
+    needs: sync
+    if: needs.sync.outputs.branch != ''
+    uses: ./.github/workflows/build-app.yml
+    with:
+      ref: ${{ needs.sync.outputs.branch }}

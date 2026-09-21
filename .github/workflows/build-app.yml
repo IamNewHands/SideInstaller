@@ -6,19 +6,36 @@ name: build-app
 # installs it (SideStore / AltStore on the device, with your own Apple ID), so
 # nothing here redistributes a build of the upstream project.
 #
-# Flow: sync upstream -> audit the diff -> run this -> install the IPA it
-# uploads. Run it from the Actions tab, or publish a release and the IPA is
-# attached to that release automatically.
+# Flow: upstream-sync audits a new upstream version and calls this workflow, or
+# you run it from the Actions tab (optionally against a sync/upstream-* branch),
+# or you publish a release and the IPA is attached to it automatically.
 
 on:
   workflow_dispatch:
     inputs:
+      ref:
+        description: "Branch or tag to build (blank = the ref you dispatched from)"
+        required: false
+        default: ""
       attach_tag:
         description: "Attach the built IPA to this tag's release (blank = workflow artifact only)"
         required: false
         default: ""
   release:
     types: [published]
+  # Called by upstream-sync after it merges a new upstream version.
+  workflow_call:
+    inputs:
+      ref:
+        description: "Branch or tag to build"
+        required: false
+        type: string
+        default: ""
+      attach_tag:
+        description: "Attach the built IPA to this tag's release (blank = artifact only)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: write   # only used to attach the IPA to a release
@@ -30,6 +47,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
+          ref: ${{ inputs.ref || github.ref }}
           fetch-depth: 0
 
       # build-rust.sh defaults DEVELOPER_DIR to /Applications/Xcode-beta.app,
@@ -120,12 +138,12 @@ jobs:
           if-no-files-found: error
 
       - name: Attach the IPA to a release
-        if: github.event_name == 'release' || github.event.inputs.attach_tag != ''
+        if: github.event_name == 'release' || inputs.attach_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
-          INPUT_TAG: ${{ github.event.inputs.attach_tag }}
+          INPUT_TAG: ${{ inputs.attach_tag }}
         run: |
           set -euo pipefail
           if [[ "${EVENT_NAME}" == "release" ]]; then

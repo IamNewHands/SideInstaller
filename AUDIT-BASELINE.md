@@ -108,11 +108,13 @@ fork_vs_upstream: 路径集合 = 上游 main + .github/workflows/build-app.yml
 - **workflow**：`permissions:`、`secrets.`、`pull_request_target`、新增 `schedule`、`curl | sh`、对外上传
 - **新增目录或新增可执行文件**
 
-### 每次同步的三步
+### 每次同步的三步（只在手动跑时用）
 
 1. `git fetch upstream && git merge upstream/main`，然后按 §4 复退
 2. `bash scripts/audit-delta.sh` → 只看 🔴 项；有就逐条给结论，没有就放行
 3. 跑一次 `build-app` workflow，出未签名 IPA
+
+平时不用手动做 —— 见 §7。
 
 ## 6. 产物怎么验
 
@@ -120,3 +122,43 @@ fork_vs_upstream: 路径集合 = 上游 main + .github/workflows/build-app.yml
 - 期望值：`CFBundleIdentifier=com.frizzle.sideinstaller`、`MinimumOSVersion=18.0`、`lipo` 显示 `arm64`（非 fat）、`codesign` 报无签名
 - 版本号来自 `latest_version.txt`，不是 `project.yml`（那里还是旧的 0.9.0）
 - 安装：SideStore / AltStore + 自己的 Apple ID。不需要企业证书，不需要 DNS 描述文件
+
+## 7. 自动化：upstream-sync（以版本为界）
+
+`.github/workflows/upstream-sync.yml` 每天 11:00（北京时间）跑一次**很轻的版本检查**（ubuntu，几秒）：
+
+- 上游没有新 release，或新 release 已经在 `main` 里 → 直接结束，**不构建**
+- 上游发了新版本 → 一次性处理**整个版本**：
+  1. 合并「`UPSTREAM-SYNCED.txt` 记录的版本 → 新 release tag」这一整段改动，并按 §4 自动复退
+  2. 跑 `scripts/audit-version.sh <旧tag> <新tag> HEAD`，报告进 run 的 Summary + artifact
+  3. 门禁通过 → 自动合并到 `main` → 调 `build-app` 出未签名 IPA（artifact）
+  4. 门禁没过 → 推 `sync/upstream-<tag>` 分支 + 建 issue 附完整报告，等你点头
+
+状态文件 `UPSTREAM-SYNCED.txt` 记录已同步到的 tag / commit，由 workflow 自己更新。
+
+### 门禁通过的条件（全部满足才会自动合并）
+
+1. 新增行没有命中高危关键词（URL/域名、危险 API、凭据…）
+2. `rust-core/vendor/**` 无改动
+3. 依赖面没有新增项（新包、git 源、url、`[patch]`）
+4. workflow 没有新增 `permissions` / `secrets` / `schedule` / `pull_request_target` / `curl`
+5. 无二进制文件改动、无可执行位
+6. 已退役路径没有回流
+7. 变更文件数 ≤ 300，且审计范围非空
+
+**门禁通过 ≠ 审计通过。** 它查不到：新域名是不是恶意、纯逻辑改动里有没有后门、已有代码行为被改写。报告最后一节固定列出"没查什么"，每次自动合并前至少扫一眼 Summary。
+
+### 手动控制
+
+Actions → upstream-sync → Run workflow：
+
+| 输入 | 作用 |
+|---|---|
+| `tag` | 指定上游 release tag（留空 = 最新） |
+| `base` | 指定审计基准（留空 = 状态文件里的版本） |
+| `mode` | `auto` 门禁通过就合并（默认）/ `review` 只审计不合并 / `merge` 跳过门禁直接合并（已人工确认） |
+| `dry_run` | 只审计：不推分支、不合并、不建 issue |
+
+只想重跑审计、不碰任何东西：`dry_run=true`，`base` 填旧 tag，`tag` 填新 tag。
+想更严格（永远不自动合并）：`mode` 固定用 `review`。
+
