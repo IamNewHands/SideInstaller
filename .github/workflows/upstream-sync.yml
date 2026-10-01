@@ -131,8 +131,16 @@ jobs:
           # squash：fork 只保留「上游这个版本的内容」，不搬运上游的历史对象
           git merge --squash "${TAG}^{commit}" || true
 
+          # 退役路径按「删」处理。注意 `git merge --squash` 会给「上游改过、
+          # fork 删过」的路径留下 modify/delete 冲突：这些路径在 index 里是
+          # stage2/3 条目，而 `git rm` 对 unmerged 条目**返回 0 却删不掉**
+          # （2026-10-01 v1.2.1 实测），于是下面的 LEFT_RETIRED 会看到一大堆
+          # 残留并 fail-closed。先 reset 回 HEAD 的「已删除」态清掉冲突；
+          # 再删工作区残留 —— 少删这一步，残留文件会被后面的 `git add -A`
+          # 加回来（文件类退役路径正是这样回流的）。
+          git reset -q -- $RETIRED 2>/dev/null || true
           git rm -r -f --ignore-unmatch --quiet $RETIRED >/dev/null 2>&1 || true
-          rm -rf output output-beta build-dd certs
+          rm -rf $RETIRED
 
           LEFT_RETIRED="$(git ls-files -- $RETIRED || true)"
           if [ -n "$LEFT_RETIRED" ]; then
