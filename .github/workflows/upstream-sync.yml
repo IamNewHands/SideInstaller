@@ -245,14 +245,25 @@ jobs:
 
             EXISTING="$(gh issue list -R "$GITHUB_REPOSITORY" --state open --limit 50 \
               --json title --jq '.[].title' | grep -F "上游 $TAG 需要人工审计" || true)"
+            HAS_ISSUES="$(gh repo view "$GITHUB_REPOSITORY" --json hasIssuesEnabled \
+              --jq .hasIssuesEnabled 2>/dev/null || echo false)"
             if [ -n "$EXISTING" ]; then
               echo "已有同名 issue，跳过创建"
-            else
+              echo "未合并：分支已推送，issue 已存在"
+            elif [ "$HAS_ISSUES" = "true" ]; then
               gh issue create -R "$GITHUB_REPOSITORY" \
                 --title "上游 $TAG 需要人工审计（$BASE → $TAG）" \
                 --body-file issue-body.md
+              echo "未合并：分支已推送，issue 已建"
+            else
+              # 仓库没开 Issues（2026-10-01 的实际情况）：报告只能落在本次运行的
+              # Summary 上。通知渠道缺失时 run 不能变绿，否则「没合并」会被静默
+              # 忽略 —— 用 warning + 失败收尾，逼人工看到。
+              echo "::warning::仓库未开启 Issues，审计报告写在本次运行的 Summary 里；同步分支 $BRANCH 已推送，可直接构建/试装"
+              { echo; cat issue-body.md; } >> "$GITHUB_STEP_SUMMARY"
+              echo "未合并：分支已推送（$BRANCH）；Issues 未开启，报告见本次运行 Summary"
+              exit 1
             fi
-            echo "未合并：分支已推送，issue 已建"
           fi
 
   build:

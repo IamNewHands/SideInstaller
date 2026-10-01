@@ -113,10 +113,17 @@ fi
 
 # 5) 新增文件 / 二进制 / 可执行位
 ADDED=$(git diff --name-status --diff-filter=A "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null || true)
-BIN=$(git diff --numstat "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | awk '$1=="-" && $2=="-" {print $3}' || true)
+# 二进制只看「新增」和「修改」：上游删掉自己 commit 过的 ipa 是好事，不该当危险
+# 信号报（2026-10-01 审计 v1.1.0→v1.2.1 时，三个被上游删除的 v1beta*.ipa 就被
+# 这条误报成「新增/改动了二进制文件」）。
+BIN_ADD=$(git diff --numstat --diff-filter=A "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | awk '$1=="-" && $2=="-" {print $3}' || true)
+BIN_MOD=$(git diff --numstat --diff-filter=M "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | awk '$1=="-" && $2=="-" {print $3}' || true)
+BIN_DEL=$(git diff --numstat --diff-filter=D "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | awk '$1=="-" && $2=="-" {print $3}' || true)
 EXEC=$(git diff --summary "$PREV..$NEW" -- . "${EXC[@]}" 2>/dev/null | grep 'mode 100755' | head -10 || true)
-if [ -n "$BIN" ]; then
-  fail "新增/改动了二进制文件：$(printf '%s\n' "$BIN" | tr '\n' ' ')"
+if [ -n "$BIN_ADD$BIN_MOD" ]; then
+  fail "新增/改动了二进制文件：$(printf '%s\n%s\n' "$BIN_ADD" "$BIN_MOD" | grep -v '^$' | tr '\n' ' ')"
+elif [ -n "$BIN_DEL" ]; then
+  pass "无新增/修改的二进制文件（上游删除了：$(printf '%s\n' "$BIN_DEL" | tr '\n' ' ')）"
 else
   pass "无二进制文件改动"
 fi
