@@ -80,6 +80,13 @@ final class CertManager: ObservableObject {
         if let session { si_cert_session_free(session) }
     }
 
+    // MARK: - Popups
+
+    /// What went wrong last, as a popup `RootView` stacks over the app.
+    var popups: [ToolPopup] { lastError.map { [.error($0)] } ?? [] }
+
+    func closePopup(_ popup: ToolPopup) { lastError = nil }
+
     // MARK: - Public actions
 
     /// Loads certificates when the page opens. Does nothing if no Apple ID is
@@ -209,6 +216,10 @@ final class CertManager: ObservableObject {
                 if engine.twoFactorWasCancelled {
                     engine.log("Two-factor verification cancelled — stopping.")
                     throw EngineError.message(L("Two-factor verification was cancelled."))
+                }
+                if Engine.isAccountLocked(lastError) {
+                    engine.log("Apple has locked this Apple Account: \(lastError)")
+                    throw EngineError.accountLocked
                 }
                 if Engine.isCredentialError(lastError) {
                     engine.log("Apple ID credentials rejected: \(lastError)")
