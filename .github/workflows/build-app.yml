@@ -216,5 +216,9 @@ jobs:
           gh release upload "$TAG" "$ASSET" --clobber -R "$GITHUB_REPOSITORY"
 
           echo "=== 当前 release ==="
-          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json url,isLatest,assets \
-            --jq '.url, .isLatest, (.assets[] | "\(.name)  \(.size) bytes")'
+          # 只用各版本 gh 都认的字段：`--json isLatest` 在老一点的 gh 上会
+          # 「Unknown JSON field」直接把这一步判失败（2026-10-01 run 36852908459
+          # 就是这样：tag、说明、资产都更新成功后死在最后这行回显上）。
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json url,tagName,assets \
+            --jq '.url, (.assets[] | "\(.name)  \(.size) bytes")'
+          echo "releases/latest → $(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
