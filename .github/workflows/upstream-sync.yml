@@ -272,3 +272,6 @@ jobs:
     uses: ./.github/workflows/build-app.yml
     with:
       ref: ${{ needs.sync.outputs.branch }}
+      # 只有已经合并进 main 的构建才发布滚动 Release；没合并的同步分支
+      # 只出 workflow artifact，供试装。
+      publish_release: ${{ needs.sync.outputs.branch == 'main' }}

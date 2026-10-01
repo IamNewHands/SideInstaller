@@ -21,6 +21,11 @@ on:
         description: "Attach the built IPA to this tag's release (blank = workflow artifact only)"
         required: false
         default: ""
+      publish_release:
+        description: "发布/就地覆盖滚动 Release（tag 固定 ipa-latest、资产固定 SideInstaller-unsigned.ipa）"
+        type: boolean
+        required: false
+        default: true
   release:
     types: [published]
   # Called by upstream-sync after it merges a new upstream version.
@@ -36,6 +41,11 @@ on:
         required: false
         type: string
         default: ""
+      publish_release:
+        description: "发布/就地覆盖滚动 Release（只有合并进 main 的构建才该为 true）"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write   # only used to attach the IPA to a release
@@ -113,7 +123,9 @@ jobs:
           set -euo pipefail
           APP="build-dd/Build/Products/Release-iphoneos/SideInstaller.app"
           test -d "$APP" || { echo "::error::no app bundle at $APP"; exit 1; }
-          IPA="SideInstaller-${MARKETING_VERSION}-unsigned.ipa"
+          # 资产名不带版本号：带版本号时上游一升版下载地址就变。版本号写进
+          # release 说明和标题里，地址保持 releases/latest/download/ 这一条。
+          IPA="SideInstaller-unsigned.ipa"
           echo "IPA=$IPA" >> "$GITHUB_ENV"
           rm -rf Payload "$IPA"
           mkdir -p Payload
@@ -137,19 +149,72 @@ jobs:
           path: ${{ env.IPA }}
           if-no-files-found: error
 
-      - name: Attach the IPA to a release
-        if: github.event_name == 'release' || inputs.attach_tag != ''
+      - name: Publish the rolling release
+        if: github.event_name == 'release' || inputs.attach_tag != '' || inputs.publish_release
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
           INPUT_TAG: ${{ inputs.attach_tag }}
+          ASSET: SideInstaller-unsigned.ipa
+          ROLLING_TAG: ipa-latest
         run: |
           set -euo pipefail
-          if [[ "${EVENT_NAME}" == "release" ]]; then
+
+          # 1) 上游自己发的 release：只把 IPA 挂上去，不动任何 tag。
+          if [ "${EVENT_NAME}" = "release" ]; then
             TAG="${RELEASE_TAG}"
-          else
-            TAG="${INPUT_TAG}"
+            test -n "$TAG"
+            gh release upload "$TAG" "$IPA" --clobber -R "$GITHUB_REPOSITORY"
+            exit 0
           fi
-          test -n "$TAG"
-          gh release upload "$TAG" "$IPA" --clobber -R "$GITHUB_REPOSITORY"
+
+          # 2) 手动指定 tag：同样只挂，不动 tag。
+          if [ -n "${INPUT_TAG}" ]; then
+            gh release upload "${INPUT_TAG}" "$IPA" --clobber -R "$GITHUB_REPOSITORY"
+            exit 0
+          fi
+
+          # 3) 滚动 release：只有一个 release、一个文件，每次就地覆盖。
+          #    tag 固定 ipa-latest、资产名固定 SideInstaller-unsigned.ipa，
+          #    所以这一条地址长期有效（SideStore / LiveContainer 可直接填）：
+          #      https://github.com/IamNewHands/SideInstaller/releases/latest/download/SideInstaller-unsigned.ipa
+          TAG="${ROLLING_TAG}"
+          SHA="$(git rev-parse HEAD)"
+
+          # tag 先挪到本次构建的提交；这一步放最前面，推不上去就整体失败，
+          # 不会留下「资产已换、tag 还指着老提交」的半成品。
+          git tag -f "$TAG" "$SHA"
+          git push -f origin "refs/tags/$TAG"
+
+          UPSTREAM="$(sed -n 's/^tag:[[:space:]]*//p' UPSTREAM-SYNCED.txt 2>/dev/null | tr -d '\r' | head -1)"
+          TESTED="$(printf '%s' "${MARKETING_VERSION:-$(tr -d ' \r\n' < latest_version.txt)}")"
+          # 打包步骤已经用固定资产名；只有名字真的不同才复制，避免 cp 到自己。
+          [ "$IPA" = "$ASSET" ] || cp "$IPA" "$ASSET"
+          {
+            printf '上游基线：`%s`\n' "${UPSTREAM:-未知}"
+            printf 'App 版本：`%s`\n' "${TESTED:-未知}"
+            printf '构建：`#%s`，提交：`%s`\n\n' "${GITHUB_RUN_NUMBER:-?}" "$SHA"
+            printf '安装：下载后用 SideStore / LiveContainer / SideInstaller 以你自己的 Apple ID 本地签名；仓库不含任何证书或描述文件。\n\n'
+            printf '同版本覆盖安装可能被判定成「已装同版本」而跳过替换，**换包前先删掉手机上的 App**。\n\n'
+            printf '稳定下载地址（每次构建就地覆盖同一个文件）：\n'
+            printf 'https://github.com/%s/releases/latest/download/%s\n' "$GITHUB_REPOSITORY" "$ASSET"
+          } > release-notes.md
+          echo "=== release notes ==="; cat release-notes.md
+
+          if gh release view "$TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "滚动 release $TAG 已存在，就地更新标题、说明与资产"
+            gh release edit "$TAG" -R "$GITHUB_REPOSITORY" \
+              --title "SideInstaller 未签名 IPA（滚动更新）" \
+              --notes-file release-notes.md --latest
+          else
+            echo "创建滚动 release $TAG"
+            gh release create "$TAG" -R "$GITHUB_REPOSITORY" \
+              --title "SideInstaller 未签名 IPA（滚动更新）" \
+              --notes-file release-notes.md --latest
+          fi
+          gh release upload "$TAG" "$ASSET" --clobber -R "$GITHUB_REPOSITORY"
+
+          echo "=== 当前 release ==="
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json url,isLatest,assets \
+            --jq '.url, .isLatest, (.assets[] | "\(.name)  \(.size) bytes")'
