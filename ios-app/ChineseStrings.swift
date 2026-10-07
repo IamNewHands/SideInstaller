@@ -142,8 +142,15 @@ let chineseStrings: [String: String] = [
         "将它输入到 设置 中的提示框内。",
     "Install stopped": "安装已停止",
     "Close": "关闭",
+    "Yes": "是",
+    "No": "否",
+    "Closing this popup will end the process. Are you sure?":
+        "关闭此弹窗将终止当前流程。确定要关闭吗？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ 已安装。完成上面的信任步骤即可打开。",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ 已安装。完成下面的信任步骤即可打开。",
+    "Success: last steps": "成功：最后几步",
     "Action needed": "需要操作",
     "Step %@ of %@": "第 %@ 步，共 %@ 步",
     "Show all steps": "显示所有步骤",
@@ -517,6 +524,16 @@ let chineseStrings: [String: String] = [
         "在 %@ 上登录 Apple ID 失败。最后的错误：%@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple 登录服务器拒绝了请求（HTTP 503）。这不是你的密码或 anisette 服务器的问题，换用其他服务器也无济于事。请稍后重试，或更新 SideInstaller。",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "SideInstaller 无法连接 Apple 登录服务器（gsa.apple.com），但这台 iPhone 已连接互联网。有东西在拦截它：防火墙、DNS 过滤或广告拦截工具、屏幕使用时间的内容限制，或其他 VPN App。请将其关闭或换一个网络，然后重试。",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "SideInstaller 无法连接 Apple：它的蜂窝数据已被关闭。请在 设置 › 蜂窝网络 中打开 SideInstaller，或连接可以上网的无线局域网，然后重试。",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "SideInstaller 无法连接 Apple：iOS 不允许它使用无线局域网。请在 设置 › App › SideInstaller › 无线数据 中选择“无线局域网与蜂窝网络”，然后重试。",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "SideInstaller 无法连接 Apple：一个设为承载所有流量的 VPN 已断开，因此 iOS 暂停了网络流量。请重新连接它，或关闭它的断网保护（kill switch）或按需连接，然后重试。",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "SideInstaller 无法连接 Apple：这台 iPhone 没有连接互联网。请连接无线局域网或打开蜂窝数据，然后重试。",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "Apple 正在暂时限制此 Apple ID 或此网络的登录（HTTP 429）。换用其他服务器无济于事，每次尝试还可能延长等待时间，请过一段时间再登录。",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
@@ -611,6 +628,29 @@ let chineseStrings: [String: String] = [
         "回到 SideInstaller，打开“设置 › 账户”，在此 Apple ID 上向左轻扫，轻点“编辑”，然后输入新密码。",
     "Then tap Install again.": "然后再次轻点“安装”。",
     "Open iForgot": "打开 iForgot",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "由于账户持有人的年龄，Apple 不允许此 Apple 账户使用开发者服务（错误 1102）。请改用成年人的 Apple 账户登录。",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "此 Apple ID 已没有可用的 App ID（错误 9120）。免费 Apple ID 每周可注册 10 个，每个会占用 7 天，所以请等一些过期，或用另一个 Apple ID 登录。",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "此 iPhone 上已有三个用免费 Apple ID 签名的 App，这是 iOS 允许的上限，已过期的也算在内。删除其中一个后再试一次。",
+    "This Apple Account can't sign apps": "此 Apple 账户无法签名 App",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "Apple 只允许成年人使用 SideInstaller 用来签名 App 的开发者服务，而它显示此 Apple 账户属于未成年人（错误 1102）。",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "请改用成年人的 Apple 账户登录：打开“设置 › 账户”并在那里添加。",
+    "No App IDs left this week": "本周已没有可用的 App ID",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "SideInstaller 签名的每个 App 和 App 扩展都需要一个 App ID。免费 Apple ID 每周可注册 10 个，每个会占用 7 天。",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "它们无法提前删除。等一些过期后，再次轻点“安装”。",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "或者在“设置 › 账户”中用另一个（或备用的）Apple ID 登录，然后再次轻点“安装”。",
+    "Three sideloaded apps already": "已有三个侧载应用",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "iOS 只允许一台 iPhone 同时安装三个用免费 Apple ID 签名的 App，因此拒绝了第四个。",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "已过期的 App 也算在内。从主屏幕删除一个不再需要的 App。",
 
     // Guide: import a pairing file
 

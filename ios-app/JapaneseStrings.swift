@@ -142,8 +142,15 @@ let japaneseStrings: [String: String] = [
         "この番号を「設定」のダイアログに入力してください。",
     "Install stopped": "インストールが停止しました",
     "Close": "閉じる",
+    "Yes": "はい",
+    "No": "いいえ",
+    "Closing this popup will end the process. Are you sure?":
+        "このポップアップを閉じると処理が終了します。よろしいですか？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ はインストールされています。上記の信頼手順を完了すると開けます。",
+    "%@ is installed. Finish the trust step below to open it.":
+        "%@ はインストールされています。下記の信頼手順を完了すると開けます。",
+    "Success: last steps": "完了：最後の手順",
     "Action needed": "対応が必要です",
     "Step %@ of %@": "手順 %@／%@",
     "Show all steps": "すべての手順を表示",
@@ -432,6 +439,16 @@ let japaneseStrings: [String: String] = [
         "%@ での Apple ID サインインに失敗しました。直近のエラー：%@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "Apple のサインインサーバーがリクエストを拒否しました（HTTP 503）。パスワードや anisette サーバーの問題ではないため、別のサーバーを試しても解決しません。しばらくしてから再度お試しいただくか、SideInstaller をアップデートしてください。",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "この iPhone はインターネットに接続されていますが、SideInstaller は Apple のサインインサーバー（gsa.apple.com）に接続できません。ファイアウォール、DNS フィルタや広告ブロッカー、スクリーンタイムのコンテンツ制限、または別の VPN App が接続を妨げています。それをオフにするか別のネットワークを試してから、もう一度お試しください。",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "SideInstaller が Apple に接続できません。この App のモバイルデータ通信がオフになっています。「設定 › モバイル通信」で SideInstaller をオンにするか、インターネットに接続できる Wi-Fi に接続してから、もう一度お試しください。",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "SideInstaller が Apple に接続できません。iOS がこの App の Wi-Fi 使用を許可していません。「設定 › アプリ › SideInstaller › ワイヤレスデータ」で「WLAN とモバイルデータ通信」を選んでから、もう一度お試しください。",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "SideInstaller が Apple に接続できません。すべての通信を経由させる設定の VPN が切断されているため、iOS が通信を止めています。その VPN を再接続するか、キルスイッチやオンデマンド接続をオフにしてから、もう一度お試しください。",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "SideInstaller が Apple に接続できません。この iPhone はインターネットに接続されていません。Wi-Fi に接続するかモバイルデータ通信をオンにしてから、もう一度お試しください。",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "Apple がこの Apple ID またはネットワークからのサインインを一時的に制限しています（HTTP 429）。別のサーバーを試しても解決せず、試すたびに待ち時間が延びる可能性があるため、しばらく時間をおいてから再度サインインしてください。",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
@@ -526,6 +543,29 @@ let japaneseStrings: [String: String] = [
         "SideInstaller に戻り、「設定 › アカウント」を開いて、この Apple ID を左にスワイプし、「編集」をタップして新しいパスワードを入力してください。",
     "Then tap Install again.": "その後、もう一度「インストール」をタップしてください。",
     "Open iForgot": "iForgot を開く",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "所有者の年齢を理由に、Apple はこの Apple アカウントでのデベロッパサービスの利用を許可していません（エラー 1102）。代わりに成人の Apple アカウントでサインインしてください。",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "この Apple ID には使える App ID が残っていません（エラー 9120）。無料の Apple ID で登録できるのは週に 10 個までで、それぞれ 7 日間カウントされます。いくつか期限切れになるのを待つか、別の Apple ID でサインインしてください。",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "この iPhone には、無料の Apple ID で署名されたアプリがすでに iOS の上限である 3 つあります（期限切れのものも含みます）。いずれかを削除してから、もう一度お試しください。",
+    "This Apple Account can't sign apps": "この Apple アカウントではアプリに署名できません",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "SideInstaller がアプリの署名に使うデベロッパサービスを Apple は成人にしか許可しておらず、この Apple アカウントは未成年のものだと報告しています（エラー 1102）。",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "代わりに成人の Apple アカウントでサインインしてください：「設定 › アカウント」を開いて追加します。",
+    "No App IDs left this week": "今週使える App ID がありません",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "SideInstaller が署名するアプリとアプリ拡張機能には、それぞれ App ID が必要です。無料の Apple ID で登録できるのは週に 10 個までで、それぞれ 7 日間カウントされます。",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "期限前に削除することはできません。いくつか期限切れになったら、もう一度「インストール」をタップしてください。",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "または、「設定 › アカウント」で別の（もしくは予備の）Apple ID でサインインしてから、もう一度「インストール」をタップしてください。",
+    "Three sideloaded apps already": "サイドロード済みアプリがすでに 3 つあります",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "iOS では、無料の Apple ID で署名されたアプリは 1 台の iPhone に同時に 3 つまでしかインストールできず、4 つ目が拒否されました。",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "期限切れのアプリも数に含まれます。不要になったアプリをホーム画面から削除してください。",
 
     // Guide: import a pairing file
 

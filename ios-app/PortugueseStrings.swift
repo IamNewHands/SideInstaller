@@ -144,8 +144,15 @@ let portugueseStrings: [String: String] = [
         "Digite este código no aviso que aparece nos Ajustes.",
     "Install stopped": "Instalação interrompida",
     "Close": "Fechar",
+    "Yes": "Sim",
+    "No": "Não",
+    "Closing this popup will end the process. Are you sure?":
+        "Fechar este pop-up vai encerrar o processo. Tem certeza?",
     "%@ is installed. Finish the trust step above to open it.":
         "O %@ está instalado. Conclua a etapa de confiança acima para abri-lo.",
+    "%@ is installed. Finish the trust step below to open it.":
+        "O %@ está instalado. Conclua a etapa de confiança abaixo para abri-lo.",
+    "Success: last steps": "Pronto: últimas etapas",
     "Action needed": "Ação necessária",
     "Step %@ of %@": "Etapa %@ de %@",
     "Show all steps": "Mostrar todas as etapas",
@@ -529,6 +536,16 @@ let portugueseStrings: [String: String] = [
         "Falha ao entrar no Apple ID em %@. Último erro: %@",
     "Apple's sign-in server refused the request (HTTP 503). It isn't your password or the anisette server, so trying more servers won't help. Try again later, or update SideInstaller.":
         "O servidor de login da Apple recusou a solicitação (HTTP 503). Não é a sua senha nem o servidor anisette, então tentar outros servidores não vai adiantar. Tente de novo mais tarde ou atualize o SideInstaller.",
+    "SideInstaller can't reach Apple's sign-in server (gsa.apple.com), though this iPhone has an internet connection. Something is blocking it: a firewall, a DNS filter or ad blocker, Screen Time content restrictions, or another VPN app. Turn it off or try another network, then try again.":
+        "O SideInstaller não consegue acessar o servidor de login da Apple (gsa.apple.com), embora este iPhone esteja conectado à internet. Algo está bloqueando: um firewall, um filtro de DNS ou bloqueador de anúncios, as restrições de conteúdo do Tempo de Uso ou outro app de VPN. Desative-o ou tente outra rede e tente de novo.",
+    "SideInstaller can't reach Apple: Cellular Data is turned off for it. Turn SideInstaller on in Settings › Cellular, or join a Wi-Fi network with internet access, then try again.":
+        "O SideInstaller não consegue acessar a Apple: os dados celulares estão desativados para ele. Ative o SideInstaller em Ajustes › Celular ou conecte-se a uma rede Wi-Fi com acesso à internet e tente de novo.",
+    "SideInstaller can't reach Apple: iOS isn't letting it use Wi-Fi. In Settings › Apps › SideInstaller › Wireless Data, choose WLAN & Cellular Data, then try again.":
+        "O SideInstaller não consegue acessar a Apple: o iOS não permite que ele use o Wi-Fi. Em Ajustes › Apps › SideInstaller › Dados Sem Fio, escolha WLAN e Dados Celulares e tente de novo.",
+    "SideInstaller can't reach Apple: a VPN set to carry all traffic is disconnected, so iOS is holding traffic back. Reconnect it, or turn off its kill switch or Connect On Demand, then try again.":
+        "O SideInstaller não consegue acessar a Apple: uma VPN configurada para levar todo o tráfego está desconectada, então o iOS está retendo o tráfego. Reconecte-a ou desative o kill switch ou a conexão sob demanda dela e tente de novo.",
+    "SideInstaller can't reach Apple: this iPhone has no internet connection. Connect to Wi-Fi or turn on cellular data, then try again.":
+        "O SideInstaller não consegue acessar a Apple: este iPhone está sem conexão com a internet. Conecte-se a uma rede Wi-Fi ou ative os dados celulares e tente de novo.",
     "Apple is temporarily limiting sign-ins for this Apple ID or network (HTTP 429). Trying other servers won't help, and every attempt can extend the wait, so leave it a while before signing in again.":
         "A Apple está limitando temporariamente os logins deste Apple ID ou desta rede (HTTP 429). Tentar outros servidores não vai adiantar, e cada tentativa pode aumentar a espera, então aguarde um pouco antes de entrar de novo.",
     "If you're sure the password is right, Apple may be limiting sign-in attempts: wait a while before trying again.":
@@ -623,6 +640,30 @@ let portugueseStrings: [String: String] = [
         "De volta ao SideInstaller, abra Ajustes › Conta, deslize este Apple ID para a esquerda, toque em Editar e digite a nova senha.",
     "Then tap Install again.": "Depois, toque em Instalar de novo.",
     "Open iForgot": "Abrir o iForgot",
+    "Apple won't let this Apple Account use developer services because of its owner's age (error 1102). Sign in with an adult's Apple Account instead.":
+        "A Apple não deixa esta conta Apple usar os serviços para desenvolvedores por causa da idade do titular (erro 1102). Entre com a conta Apple de um adulto.",
+    "This Apple ID has no App IDs left (error 9120). A free Apple ID can register 10 a week, and each one counts for 7 days, so wait for some to expire or sign in with another Apple ID.":
+        "Este Apple ID não tem mais App IDs disponíveis (erro 9120). Um Apple ID gratuito pode registrar 10 por semana, e cada um conta por 7 dias, então espere alguns expirarem ou entre com outro Apple ID.",
+    "This iPhone already has three apps signed with a free Apple ID, the most iOS allows, counting expired ones. Delete one of them, then try again.":
+        "Este iPhone já tem três apps assinados com um Apple ID gratuito, o máximo que o iOS permite, contando os expirados. Apague um deles e tente de novo.",
+    "This Apple Account can't sign apps":
+        "Esta conta Apple não pode assinar apps",
+    "Apple only lets adults use the developer services SideInstaller signs apps with, and it reports that this Apple Account belongs to someone younger (error 1102).":
+        "A Apple só deixa adultos usarem os serviços para desenvolvedores com que o SideInstaller assina apps, e informa que esta conta Apple pertence a alguém mais novo (erro 1102).",
+    "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
+        "Entre com a conta Apple de um adulto: abra Ajustes › Conta e adicione-a lá.",
+    "No App IDs left this week": "Sem App IDs nesta semana",
+    "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
+        "Todo app e extensão de app que o SideInstaller assina precisa de um App ID. Um Apple ID gratuito pode registrar 10 por semana, e cada um conta por 7 dias.",
+    "They can't be deleted sooner. Wait until some expire, then tap Install again.":
+        "Não dá para apagá-los antes. Espere alguns expirarem e toque em Instalar de novo.",
+    "Or sign in with a different (or spare) Apple ID in Settings › Account, then tap Install again.":
+        "Ou entre com outro Apple ID (ou um reserva) em Ajustes › Conta e toque em Instalar de novo.",
+    "Three sideloaded apps already": "Já há três apps por sideload",
+    "iOS allows three apps signed with a free Apple ID on an iPhone at a time, and it refused a fourth.":
+        "O iOS permite três apps assinados com um Apple ID gratuito em um iPhone ao mesmo tempo, e recusou um quarto.",
+    "Expired apps count too. Delete one you no longer need from the Home Screen.":
+        "Apps expirados também contam. Apague da Tela de Início um que você não usa mais.",
 
     "Import a pairing file": "Importe um arquivo de pareamento",
     "iOS %@ is the first version an iPhone can pair with itself on. On this one the pairing file has to be made on a computer.":

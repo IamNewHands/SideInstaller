@@ -66,6 +66,8 @@ impl Sideloader {
     ///
     /// `register_device` is a device's (name, UDID) to register with the team
     /// first, since the provisioning profile only covers registered devices.
+    /// `pairing_file` is that device's RPPairing record, which goes encrypted
+    /// into AltStore's bundle and is ignored for every other app.
     pub async fn sign_app(
         &mut self,
         app_path: PathBuf,
@@ -73,6 +75,7 @@ impl Sideloader {
         // this will be replaced with proper entitlement handling later
         increased_memory_limit: bool,
         register_device: Option<(&str, &str)>,
+        pairing_file: Option<&[u8]>,
     ) -> Result<(PathBuf, Option<SpecialApp>), Report> {
         let team = match team {
             Some(t) => t,
@@ -188,9 +191,15 @@ impl Sideloader {
         let dev_session = &mut self.dev_session;
         let ((), provisioning_profile) = try_join(
             async {
-                app.apply_special_app_behavior(&special, &group_identifier, &cert_identity)
-                    .await
-                    .context("Failed to modify app bundle")?;
+                app.apply_special_app_behavior(
+                    &special,
+                    &group_identifier,
+                    &cert_identity,
+                    register_device.map(|(_, udid)| udid),
+                    pairing_file,
+                )
+                .await
+                .context("Failed to modify app bundle")?;
                 Ok::<(), Report>(())
             },
             async {
@@ -211,25 +220,10 @@ impl Sideloader {
             ext.write_info()?;
         }
 
-        tokio::fs::write(
-            app.bundle.bundle_dir.join("embedded.mobileprovision"),
-            provisioning_profile.encoded_profile.as_ref(),
-        )
-        .await?;
-
-        // Every nested bundle is signed with the main app's entitlements below,
-        // so the main profile is the one that authorizes an extension too — give
-        // each .appex its own copy. Hosts read it back (AltStore-family apps
-        // reject an extension without one), and it must land before signing
-        // because embedded.mobileprovision is sealed into CodeResources.
-        for ext in app.bundle.app_extensions() {
-            tokio::fs::write(
-                ext.bundle_dir.join("embedded.mobileprovision"),
-                provisioning_profile.encoded_profile.as_ref(),
-            )
-            .await?;
-        }
-
+        // `sign` writes embedded.mobileprovision into the app and each .appex
+        // as it signs them, since the profile is sealed into CodeResources.
+        // Hosts read an extension's copy back: AltStore-family apps reject an
+        // extension without one.
         sign::sign(
             &mut app,
             &cert_identity,
@@ -245,13 +239,15 @@ impl Sideloader {
     }
 
     #[cfg(feature = "install")]
-    /// Sign and install an app to a device.
+    /// Sign and install an app to a device. `pairing_file` is as for
+    /// [`Self::sign_app`].
     pub async fn install_app(
         &mut self,
         device_provider: &impl IdeviceProvider,
         app_path: PathBuf,
         // this is gross but will be replaced with proper entitlement handling later
         increased_memory_limit: bool,
+        pairing_file: Option<&[u8]>,
     ) -> Result<Option<SpecialApp>, Report> {
         let device_info = IdeviceInfo::from_device(device_provider).await?;
 
@@ -262,6 +258,7 @@ impl Sideloader {
                 Some(team),
                 increased_memory_limit,
                 Some((&device_info.name, &device_info.udid)),
+                pairing_file,
             )
             .await?;
 
