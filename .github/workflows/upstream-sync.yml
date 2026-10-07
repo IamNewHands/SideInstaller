@@ -118,10 +118,13 @@ jobs:
           # 上游仍在跟踪这些路径，合并会把它们带回来 —— 一律按「删」处理
           RETIRED="output output-beta build-dd certs \
             .github/workflows/sign-sideinstaller.yml .github/workflows/plist-and-index.yml \
+            .github/workflows/update-altsource.yml \
             index.html index.html.orig beta.html terms.html \
             cert-url.txt ipa-url.txt SideInstallerDNS.mobileconfig \
+            frizzlem.json \
             scripts/sign_with_all_certs.sh scripts/check_for_changes.sh \
             scripts/generate_index.sh scripts/generate_plist.sh \
+            scripts/update_altsource.py \
             scripts/template.html scripts/template.html.orig"
 
           git config user.name  "github-actions[bot]"

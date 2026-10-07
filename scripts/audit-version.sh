@@ -21,11 +21,10 @@ fi
 
 # 已退役路径（与 scripts/audit-delta.sh 保持一致）：证书池目录、重签 workflow、
 # 重签脚本、Pages 页面、证书池输入
-RETIRED_RE='^(output|output-beta|build-dd|certs)/|^\.github/workflows/(sign-sideinstaller|plist-and-index)\.yml$|^(index|beta|terms)\.html(\.orig)?$|^scripts/(sign_with_all_certs|check_for_changes|generate_index|generate_plist)\.sh$|^scripts/template\.html(\.orig)?$|^(cert-url|ipa-url)\.txt$|^SideInstallerDNS\.mobileconfig$'
+RETIRED_RE='^(output|output-beta|build-dd|certs)/|^\.github/workflows/(sign-sideinstaller|plist-and-index|update-altsource)\.yml$|^(index|beta|terms)\.html(\.orig)?$|^scripts/(sign_with_all_certs|check_for_changes|generate_index|generate_plist|update_altsource)\.(sh|py)$|^scripts/template\.html(\.orig)?$|^(cert-url|ipa-url)\.txt$|^SideInstallerDNS\.mobileconfig$|^frizzlem\.json$'
 
-# 上游自己在跟踪的大目录：它们永远不进 main，也不参与版本审计（否则 diff 会去
-# 拉几百 MB 的 ipa，还会把"上游又重签了一批证书"误报成危险信号）
-EXC=(':(exclude)output/**' ':(exclude)output-beta/**' ':(exclude)build-dd/**' ':(exclude)certs/**')
+# 上游自己在跟踪的大目录与退役路径：它们永远不进 main，也不参与版本审计
+EXC=(':(exclude)output/**' ':(exclude)output-beta/**' ':(exclude)build-dd/**' ':(exclude)certs/**' ':(exclude)frizzlem.json' ':(exclude).github/workflows/update-altsource.yml' ':(exclude)scripts/update_altsource.py')
 
 KEYWORDS='https?://|posix_spawn|dlopen|dlsym|NSTask|Process\(|system\(|popen|URLSession|URLRequest|CFNetwork|SecItem|Keychain|altIRK|atob\(|eval\(|-----BEGIN|password|passwd|secret|token|AKIA|ghp_|eyJ'
 MAX_FILES=300
