@@ -16,6 +16,7 @@ let portugueseStrings: [String: String] = [
     "Password": "Senha",
     "Install": "Instalar",
     "Installing": "Instalando",
+    "Cancelling": "Cancelando",
     "Installed": "Instalado",
     "Something went wrong": "Algo deu errado",
     "an app by Frizzle": "um app de Frizzle",
@@ -148,6 +149,7 @@ let portugueseStrings: [String: String] = [
     "No": "Não",
     "Closing this popup will end the process. Are you sure?":
         "Fechar este pop-up vai encerrar o processo. Tem certeza?",
+    "Cancel the install?": "Cancelar a instalação?",
     "%@ is installed. Finish the trust step above to open it.":
         "O %@ está instalado. Conclua a etapa de confiança acima para abri-lo.",
     "%@ is installed. Finish the trust step below to open it.":
@@ -473,7 +475,7 @@ let portugueseStrings: [String: String] = [
     "Tunnel": "Túnel",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Algo em %@:%d recusou a conexão, então o túnel está funcionando: é o dispositivo que não está escutando na porta de pareamento. Essa porta só abre com o Modo de Desenvolvedor ligado, e o iOS pede de novo depois de cada reinício: ative em Ajustes › Privacidade e Segurança › Modo de Desenvolvedor e tente outra vez. Se já estiver ligado, pareie este iPhone de novo em “Arquivo de pareamento”.",
-    "Start LocalDevVPN on launch": "Iniciar o LocalDevVPN ao abrir",
+    "Start LocalDevVPN when needed": "Iniciar o LocalDevVPN quando for preciso",
     "Start LocalDevVPN now": "Iniciar o LocalDevVPN agora",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "O LocalDevVPN não está instalado. Baixe-o na App Store e o SideInstaller poderá iniciá-lo para você.",
@@ -519,6 +521,8 @@ let portugueseStrings: [String: String] = [
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "O GitHub está limitando as requisições desta rede — ela não está bloqueada, e o limite se resolve sozinho. Tente de novo %@.",
     "GitHub answered HTTP %d%@": "O GitHub respondeu HTTP %d%@",
+    "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
+        "O GitHub não está disponibilizando %@ no momento — o repositório foi removido, movido ou tornado privado, então não há nada para baixar. Não há nada de errado com este iPhone nem com a rede dele.",
     "couldn't reach GitHub: %@": "não foi possível acessar o GitHub: %@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
         "A resposta do GitHub não trazia informações de versão (%@) — algo nesta rede pode tê-la substituído.",
@@ -607,6 +611,13 @@ let portugueseStrings: [String: String] = [
         "Ou copie-o para Arquivos › No meu iPhone › SideInstaller, onde o SideInstaller também o encontra.",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "É por aqui que se resolve onde o GitHub está bloqueado: baixe o IPA em qualquer aparelho, traga-o para cá e instale-o aqui.",
+    "Bring the .ipa yourself": "Traga você mesmo o .ipa",
+    "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
+        "Não dá para baixar o %@ enquanto o repositório dele no GitHub estiver fora do ar. Os outros apps continuam instalando normalmente.",
+    "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
+        "Para instalá-lo mesmo assim, consiga o .ipa dele em uma fonte em que você confie, dê a ele o nome %@ e copie-o para Arquivos › No meu iPhone › SideInstaller.",
+    "Then tap Install again — SideInstaller uses your file instead of downloading one.":
+        "Depois, toque em Instalar de novo — o SideInstaller usa o seu arquivo em vez de baixar um.",
     "Pair this iPhone in Settings": "Pareie este iPhone nos Ajustes",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Abra o app Ajustes e vá em Privacidade e Segurança › Modo de Desenvolvedor.",
@@ -615,6 +626,17 @@ let portugueseStrings: [String: String] = [
         "Digite o código do seu iPhone, se ele pedir.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Volte ao SideInstaller, veja o código que ele mostra e digite esse mesmo código no aviso que aparece nos Ajustes.",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "Digite o código que aparece no topo da tela no aviso que aparece nos Ajustes. Se não aparecer nenhum, volte ao SideInstaller para ver.",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "Permita as notificações quando o SideInstaller pedir: é assim que o código de pareamento chega até você nos Ajustes.",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "Privacidade e Segurança › Modo de Desenvolvedor › Parear com o SideInstaller",
+    "Paired": "Pareado",
+    "Tap to return to SideInstaller.": "Toque para voltar ao SideInstaller.",
+
     "A signing certificate already exists": "Já existe um certificado de assinatura",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "A Apple devolveu o erro 7460: este Apple ID já tem um certificado de desenvolvimento iOS, ou um pedido continua pendente.",
@@ -652,6 +674,16 @@ let portugueseStrings: [String: String] = [
         "A Apple só deixa adultos usarem os serviços para desenvolvedores com que o SideInstaller assina apps, e informa que esta conta Apple pertence a alguém mais novo (erro 1102).",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "Entre com a conta Apple de um adulto: abra Ajustes › Conta e adicione-a lá.",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "A Apple não deixa esta conta Apple usar os serviços para desenvolvedores até o endereço de e-mail dela ser verificado (erro 2160). Verifique-o em account.apple.com e tente de novo.",
+    "Verify your Apple Account's email":
+        "Verifique o e-mail da sua conta Apple",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "A Apple não deixa esta conta Apple assinar apps até o endereço de e-mail dela ser verificado (erro 2160). Entrar de novo ou usar outro servidor anisette não muda isso.",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "Entre em account.apple.com com esta conta Apple e verifique o endereço de e-mail quando a Apple pedir. A Apple envia o código ou o link para esse endereço, então confira também a pasta de spam.",
+    "Open Apple Account":
+        "Abrir a conta Apple",
     "No App IDs left this week": "Sem App IDs nesta semana",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "Todo app e extensão de app que o SideInstaller assina precisa de um App ID. Um Apple ID gratuito pode registrar 10 por semana, e cada um conta por 7 dias.",
@@ -737,6 +769,18 @@ let portugueseStrings: [String: String] = [
     "Links": "Links",
     "Source code": "Código-fonte",
     "Support the project": "Apoie o projeto",
+    "Crypto": "Cripto",
+    "Donation wallets for Bitcoin, Ethereum and Solana.":
+        "Carteiras para doações em Bitcoin, Ethereum e Solana.",
+    "Crypto donations": "Doações em cripto",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "As doações são totalmente opcionais. Elas não compram nada, não desbloqueiam nenhum recurso nem dão nada em troca; são só uma forma de agradecer se o SideInstaller te ajudou.",
+    "Coin": "Moeda",
+    "Network: %@": "Rede: %@",
+    "QR code for the %@ address": "Código QR do endereço %@",
+    "Copied": "Copiado",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "Envie cada moeda apenas pela rede indicada. Criptomoedas enviadas por outra rede não podem ser recuperadas.",
 
     "Special thanks": "Agradecimentos especiais",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -763,4 +807,22 @@ let portugueseStrings: [String: String] = [
         "Só as versões da página de instalação e do repositório oficiais são minhas. Qualquer um pode bifurcar o código, acrescentar um ladrão de credenciais e publicá-lo com o mesmo nome e ícone — então não confie seu Apple ID a uma cópia de outro lugar.",
     "Install page": "Página de instalação",
     "Terms": "Termos",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.":
+        "O %@ precisa do iOS %d ou posterior. Este iPhone usa o iOS %@.",
+    "Open Madeira from your Home Screen.": "Abra o Madeira pela Tela de Início.",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "Na configuração dele, em “Set up JIT”, escolha “In-app with pairing file”: o SideInstaller já colocou o arquivo lá, então toque em “Continue”.",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "Na configuração dele, em “Set up JIT”, escolha como este iPhone vai ter JIT.",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "A partir de agora o Madeira renova a própria assinatura, quando está aberto e o LocalDevVPN está conectado. O SideInstaller deu a ele um acesso para isso: um token do serviço de desenvolvedor da Apple, não a sua senha. O Madeira pode esquecê-lo em Settings › Signing.",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "A assinatura dele dura 7 dias. Antes de acabarem, renove aqui em Ferramentas › Apps instalados por sideload.",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "Este arquivo de pareamento não tem um registro RPPairing, o único tipo que o %@ lê.",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Roda jogos de PC para Windows no seu iPhone. De Will Faust, GPL-3.0.",
 ]

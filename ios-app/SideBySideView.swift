@@ -544,11 +544,15 @@ final class SideBySideManager: ObservableObject {
         let dir = PrivateStore.isideload.path
         engine.twoFactorWasCancelled = false
         var lastFailure = "no anisette servers configured"
-        var appleRefusals = 0
+        var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
 
         for (index, anisette) in servers.enumerated() {
             try Task.checkCancellation()
+            if appleRefusals.rulesOut(anisette) {
+                engine.log("Side by Side: skipping anisette \(index + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
+                continue
+            }
             do {
                 let summary = try await onSignQueue {
                     try self.performSignIn(id: id, pw: pw, anisette: anisette, dir: dir)
@@ -569,6 +573,10 @@ final class SideBySideManager: ObservableObject {
                     engine.log("Apple has locked this Apple Account: \(lastFailure)")
                     throw EngineError.accountLocked
                 }
+                if Engine.isEmailUnverifiedError(lastFailure) {
+                    engine.log("Apple wants this Apple Account's email address verified first: \(lastFailure)")
+                    throw EngineError.emailUnverified
+                }
                 // Bad credentials fail everywhere, and retrying risks a lockout.
                 if Engine.isCredentialError(lastFailure) {
                     engine.log("Apple ID credentials rejected: \(lastFailure)")
@@ -579,11 +587,12 @@ final class SideBySideManager: ObservableObject {
                     engine.log("Side by Side: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
                 }
-                // Apple refusing the request fails the same on every server.
+                // Apple refuses a reported device through every server alike;
+                // see `AnisetteServer.AppleRefusals`.
                 if Engine.isAppleServiceRefusal(lastFailure) {
-                    appleRefusals += 1
-                    if appleRefusals >= 2 {
-                        engine.log("Side by Side: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
+                    appleRefusals.record(anisette)
+                    if appleRefusals.endsSignIn(remaining: servers[(index + 1)...]) {
+                        engine.log("Side by Side: Apple's sign-in server refused \(appleRefusals.count) attempts with HTTP 503 — stopping.")
                         throw EngineError.message(Engine.appleServiceRefusalMessage)
                     }
                 }
@@ -699,8 +708,9 @@ final class SideBySideManager: ObservableObject {
         engine.log("Signing \(ipa) for \(udid.isEmpty ? "their iPhone" : udid) …")
         var signed: UnsafeMutablePointer<CChar>?
         var error: UnsafeMutablePointer<CChar>?
-        // SideInstaller has no use for a bundled pairing file.
-        let rc = si_sign_ipa(session, ipa, udid, deviceName, nil, &signed, &error)
+        // SideInstaller has no use for a bundled pairing file, or for more
+        // memory; it gets its app group like any app.
+        let rc = si_sign_ipa(session, ipa, udid, deviceName, nil, 0, 1, &signed, &error)
         if rc == 0 {
             let path = signed.map { String(cString: $0) } ?? ""
             signed.map { si_string_free($0) }
@@ -768,15 +778,9 @@ final class SideBySideManager: ObservableObject {
 
     // MARK: - Helpers
 
-    /// Anisette addresses to try, the engine's current pick first.
+    /// Anisette addresses to try, in the engine's order.
     private func anisetteCandidates() -> [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        for address in [engine.anisetteURL] + engine.anisetteServers.map(\.address) {
-            let trimmed = address.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty, seen.insert(trimmed).inserted { out.append(trimmed) }
-        }
-        return out
+        engine.anisetteCandidates()
     }
 
     private static func tidy(_ value: String) -> String {

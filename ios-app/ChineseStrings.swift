@@ -14,6 +14,7 @@ let chineseStrings: [String: String] = [
     "Password": "密码",
     "Install": "安装",
     "Installing": "正在安装",
+    "Cancelling": "正在取消",
     "Installed": "已安装",
     "Something went wrong": "出了点问题",
     "an app by Frizzle": "由 Frizzle 打造的应用",
@@ -146,6 +147,7 @@ let chineseStrings: [String: String] = [
     "No": "否",
     "Closing this popup will end the process. Are you sure?":
         "关闭此弹窗将终止当前流程。确定要关闭吗？",
+    "Cancel the install?": "要取消安装吗？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ 已安装。完成上面的信任步骤即可打开。",
     "%@ is installed. Finish the trust step below to open it.":
@@ -461,7 +463,7 @@ let chineseStrings: [String: String] = [
     "Tunnel": "隧道",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d 上有东西拒绝了连接，说明隧道是通的，只是设备没有在它的配对端口上监听。该端口只有在开启开发者模式时才会打开，而且每次重启后 iOS 都会再次要求确认：请在 设置 › 隐私与安全性 › 开发者模式 中打开它，然后重试。如果已经打开，请在“配对文件”中重新配对这台 iPhone。",
-    "Start LocalDevVPN on launch": "启动时打开 LocalDevVPN",
+    "Start LocalDevVPN when needed": "需要时打开 LocalDevVPN",
     "Start LocalDevVPN now": "立即启动 LocalDevVPN",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "未安装 LocalDevVPN。请从 App Store 获取，SideInstaller 就能为你启动它。",
@@ -507,6 +509,8 @@ let chineseStrings: [String: String] = [
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub 正在限制此网络的请求频率 —— 它没有被屏蔽，限制会自动解除。请在%@重试。",
     "GitHub answered HTTP %d%@": "GitHub 返回了 HTTP %d%@",
+    "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
+        "GitHub 目前无法提供 %@ —— 该代码仓库已被下架、迁移或设为私有，因此没有可下载的内容。这台 iPhone 及其网络没有任何问题。",
     "couldn't reach GitHub: %@": "无法连接到 GitHub：%@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
         "GitHub 的响应不是发行版信息（%@）—— 此网络上的某个环节可能替换了它。",
@@ -596,6 +600,13 @@ let chineseStrings: [String: String] = [
         "也可以把它复制到 文件 › 我的 iPhone › SideInstaller，SideInstaller 同样能找到。",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "在 GitHub 被封锁的地区，这就是可行的办法：在任何设备上取得 IPA，带过来，然后在这里安装。",
+    "Bring the .ipa yourself": "自行提供 .ipa",
+    "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
+        "%@ 的 GitHub 代码仓库下线期间无法下载。其他 App 仍可照常安装。",
+    "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
+        "如果仍想安装，请从你信任的来源取得它的 .ipa，命名为 %@，然后复制到 文件 › 我的 iPhone › SideInstaller。",
+    "Then tap Install again — SideInstaller uses your file instead of downloading one.":
+        "然后再次轻点“安装”—— SideInstaller 会使用你的文件，而不再下载。",
     "Pair this iPhone in Settings": "在 设置 中配对此 iPhone",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "打开 设置 应用，然后进入 隐私与安全性 › 开发者模式。",
@@ -603,6 +614,17 @@ let chineseStrings: [String: String] = [
     "Enter your iPhone’s passcode if it asks for it.": "如果系统要求，请输入你的 iPhone 密码。",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "回到 SideInstaller，查看它显示给你的验证码，然后把相同的验证码输入到 设置 中的提示框内。",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "将屏幕顶部显示的验证码输入到 设置 中的提示框内。如果没有显示，请回到 SideInstaller 查看。",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "当 SideInstaller 询问时，请允许通知：配对码会通过通知显示在 设置 中。",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "隐私与安全性 › 开发者模式 › 与 SideInstaller 配对",
+    "Paired": "已配对",
+    "Tap to return to SideInstaller.": "轻点以返回 SideInstaller。",
+
     "A signing certificate already exists": "已存在签名证书",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple 返回错误 7460：此 Apple ID 已有一个 iOS 开发证书，或者有一个申请仍在处理中。",
@@ -639,6 +661,16 @@ let chineseStrings: [String: String] = [
         "Apple 只允许成年人使用 SideInstaller 用来签名 App 的开发者服务，而它显示此 Apple 账户属于未成年人（错误 1102）。",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "请改用成年人的 Apple 账户登录：打开“设置 › 账户”并在那里添加。",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "在电子邮件地址通过验证之前，Apple 不允许此 Apple 账户使用开发者服务（错误 2160）。请在 account.apple.com 验证后再试。",
+    "Verify your Apple Account's email":
+        "验证你的 Apple 账户电子邮件",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "在电子邮件地址通过验证之前，Apple 不允许此 Apple 账户签名 App（错误 2160）。重新登录或换用其他 anisette 服务器都无法改变这一点。",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "用此 Apple 账户登录 account.apple.com，并在 Apple 提示时验证电子邮件地址。Apple 会把验证码或链接发送到该地址，也请检查垃圾邮件文件夹。",
+    "Open Apple Account":
+        "打开 Apple 账户",
     "No App IDs left this week": "本周已没有可用的 App ID",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "SideInstaller 签名的每个 App 和 App 扩展都需要一个 App ID。免费 Apple ID 每周可注册 10 个，每个会占用 7 天。",
@@ -727,6 +759,17 @@ let chineseStrings: [String: String] = [
     "Links": "链接",
     "Source code": "源代码",
     "Support the project": "支持这个项目",
+    "Crypto": "加密货币",
+    "Donation wallets for Bitcoin, Ethereum and Solana.": "比特币、以太坊和 Solana 的捐赠钱包。",
+    "Crypto donations": "加密货币捐赠",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "捐赠完全自愿。捐赠不会购买任何东西，不会解锁任何功能，也不会带来任何回报；这只是在 SideInstaller 帮到你时表达感谢的一种方式。",
+    "Coin": "币种",
+    "Network: %@": "网络：%@",
+    "QR code for the %@ address": "%@ 地址的二维码",
+    "Copied": "已复制",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "每种币请只通过所示网络发送。通过其他网络发送的加密货币将无法找回。",
 
     "Special thanks": "特别感谢",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -753,4 +796,21 @@ let chineseStrings: [String: String] = [
         "只有官方安装页面和代码仓库上的构建版本才是我发布的。任何人都可以 fork 源代码，加入窃取凭据的代码，再用同样的名称和图标发布——所以不要把你的 Apple ID 交给来自其他地方的副本。",
     "Install page": "安装页面",
     "Terms": "条款",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ 需要 iOS %d 或更高版本。这台 iPhone 运行的是 iOS %@。",
+    "Open Madeira from your Home Screen.": "从主屏幕打开 Madeira。",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "在它的设置流程中，在“Set up JIT”下选择“In-app with pairing file”：SideInstaller 已经把文件放进去了，轻点“Continue”即可。",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "在它的设置流程中，在“Set up JIT”下选择这台 iPhone 获得 JIT 的方式。",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "从现在起，只要 Madeira 处于打开状态且 LocalDevVPN 已连接，它就会自行续签。为此 SideInstaller 给了它一个登录凭据：用于 Apple 开发者服务的令牌，而不是你的密码。可以在 Madeira 的 Settings › Signing 中将其移除。",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "它的签名有效期为 7 天。到期前，请在这里的“工具 › 侧载应用”中续签。",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "这个配对文件没有 RPPairing 记录，而 %@ 只读取这一种。",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "在你的 iPhone 上运行 Windows 电脑游戏，由 Will Faust 开发，GPL-3.0 许可证。",
 ]

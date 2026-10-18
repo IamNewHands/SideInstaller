@@ -386,6 +386,57 @@ instructions, Cancel ending the host, and a second run starting cleanly. The PIN
 exchange and the tunnel need a second iPhone; the reporter ran the same mechanism
 (pairable host → RPPairing tunnel → RSD → install) end to end on two iOS 27 iPhones.
 
+#### The pairing Live Activity
+
+Pairing this iPhone means typing a code SideInstaller shows into a prompt in
+Settings, with SideInstaller behind it. `PairingLiveActivity` puts the code over
+Settings instead: `PairingController` starts the activity when the host goes up
+(the app is still in front then, which `Activity.request` needs), updates it with
+the code from `presentPin`, and ends it when the run does. The updates come from
+the background, which works because pairing's keep-alive audio keeps the app
+running. Both the code and "Paired" go out with an `AlertConfiguration`: that is
+what opens the Dynamic Island, and on an iPhone without one it drops the Lock
+Screen card down as a banner for about six seconds. Side by Side doesn't use it:
+that code is typed into the other iPhone, with this app in front.
+
+A Live Activity's views have to live in a widget extension, so there is a second
+target, `SideInstallerLiveActivity` (`ios-live-activity/`), embedded as
+`PlugIns/SideInstallerLiveActivity.appex`. It shares
+`ios-app/PairingActivityAttributes.swift` with the app and nothing else: the copy
+arrives in the content state, already translated, since the extension has neither
+the tables nor the language setting.
+
+An extension needs an application-identifier of its own, under the app's.
+`scripts/sign_with_all_certs.sh` therefore signs it only under a wildcard profile
+(`TEAM.*`), renamed to sit under the app's new bundle id; under an explicit
+profile, which covers one id, it removes `PlugIns/`. Every certificate in the pool
+on 2026-10-11 had an explicit profile, so none of those builds carry the
+extension. Xcode's automatic signing and SideStore/AltStore give the extension
+its own App ID, which on a free Apple ID counts against the weekly limit.
+
+Those builds get the code as a local notification instead (`PairingNotification`):
+"Pairing code" with the code as its subtitle, replaced by "Paired" under the same
+identifier, and cleared when the app is back in front. That costs the system's
+"would like to send you notifications" prompt, which comes up when the first
+pairing starts, with a step added to the guide saying why. `PairingController`
+picks the Live Activity or the notification once, on
+`PairingLiveActivity.hasExtension`, and `PairingNotification` checks it again
+before it asks or posts: a build with the extension never asks, also when Live
+Activities are switched off for the app. A refusal leaves the old wording and
+the popup in the app.
+
+Verified in the iOS 27 simulator with a staged run (start → code → paired): the
+compact and expanded island on an iPhone 17 (not the minimal one, which takes a
+second app's activity), the Lock Screen card, the banner on an iPhone 17e, and the
+activity ending 15 s after "Paired". The
+signing paths were run against the built app with an ad-hoc identity (wildcard,
+wildcard with `FORCED_BUNDLE_ID`, explicit). The notification path was staged the
+same way on a build with `PlugIns/` deleted: the prompt, both banners over
+Settings, one delivered notification going to none on return, and no prompt on
+the second run; the build with the extension stayed at "not determined"
+throughout. Not verified: a real pairing on a device, an install of a build
+signed through the wildcard path, and a refused prompt.
+
 
 ### Step 3 — Apple ID + signing — code complete; device/account steps unverified
 
@@ -410,7 +461,10 @@ exchange and the tunnel need a second iPhone; the reporter ran the same mechanis
 - `si_account_config(session, …)` — builds the `Account.sideconf` payload
   SideStore imports at launch: Apple ID, the signing certificate as a PKCS#12
   encrypted with its machine id (the convention AltStore-family apps expect),
-  and the anisette identity. Swift writes it into SideStore's Documents in the
+  and the anisette identity the session signed in with (since 1.5.2 there is
+  one per ADI library, Android and Windows, which can't use each other's:
+  `remote_v3::state_key_for` names the session server's). Swift writes it into
+  SideStore's Documents in the
   same step as the pairing file (step 8), and SideStore's
   `LaunchViewController.detectAndImportAccountFile` adopts it and deletes it.
 
@@ -739,6 +793,80 @@ Feather. They need a build that reads the RPPairing record. Before iOS 27 the
 attempt still runs; it is only reachable with an imported RPPairing-only file,
 and whether it works there is unverified (pymobiledevice3's refusal suggests it
 doesn't).
+
+## Madeira
+
+[Madeira](https://github.com/willfaust/Madeira) (Windows PC games through Wine and
+FEX) is a fourth `InstallSource`. Four things differ from SideStore.
+
+**The download.** Its release asset is named after the version
+(`Madeira-0.1.3.ipa` on tag `v0.1.3`), so there's no fixed `latest/download` URL.
+`SideStoreDownloader.latestTag` reads the tag off where
+`github.com/<repo>/releases/latest` redirects to, which has no rate limit, and the
+URL is built from it; a 404 falls back to the API as before. There's no nightly,
+so the channel picker is hidden and `Engine.selectedChannel` is always stable.
+`minimumOSMajorVersion` stops a run below iOS 26, which Madeira's JIT helper
+needs.
+
+**Signing.** Madeira isn't ready to play without
+`com.apple.developer.kernel.increased-memory-limit`. `si_sign_ipa` takes a flag
+that has isideload enable that capability on the app's App IDs before the profile
+is requested (`Engine.isMadeira` also catches a Madeira IPA imported as custom, or
+refreshed from Documents, by its bundle id: `com.willfaust.madeora` or any id under
+it, such as the `.test` one the pinned build has). Its `MadeiraJITHelper.appex` is signed like every
+extension here, with the main app's profile and entitlements, and renamed with the
+app (`<id>.<team>.JITHelper`), which is how Madeira finds it. Madeira picks its
+background task from `BGTaskSchedulerPermittedIdentifiers` by taking the first
+entry ending in `.download.*`, so the rebased entries now go first (vendored
+isideload README, change 9).
+
+**The pairing file.** Madeira keeps it in its Keychain, which nothing outside can
+write, but moves in a file it finds at `Documents/StikJIT/pairingFile.plist`
+whenever it reads the pairing (`JITPairingFileStore.moveLegacyFile`, there for
+its builds from before the Keychain). `MadeiraPairingHandoff` writes the RPPairing
+record there, cut down to its own keys. Madeira refuses anything else and would
+leave it lying in Documents, so a file without that record isn't written. A
+failed hand-off doesn't fail the install: Madeira can pair itself on iOS 27. A
+Madeira IPA imported as a custom IPA is recognised by its signed bundle id and
+handled the same way.
+
+**The refresh.** Madeira renews its own profile, so it doesn't depend on
+SideInstaller staying installed. What it lacks is an Apple sign-in, and
+`MadeiraSigningHandoff` gives it one without the password: `si_signing_account`
+reads the session's `com.apple.gs.xcode.auth` token, its adsid, the team and the
+anisette identity (identifier and `adi.pb`) — what SideStore's `AuthManager`
+keeps to refresh from — and the engine adds the anisette servers a sign-in
+tries that are on the same ADI library as the one in use (only those can use
+that identity), the one in use first (HTTPS ones, six at most), so one server
+going away doesn't strand Madeira. It goes
+as a binary plist to `Library/Application Support/SigningAccount.plist` in
+Madeira's container (not Documents, which Files shows), and only when the signed
+bundle's Info.plist has `MadeiraSigningAccountVersion`, so a token is never left
+in a build that won't take it in. Madeira moves it to its Keychain at launch,
+then per refresh: anisette `v3/get_headers`, `listAppIds` (or `addAppId` once the
+weekly App ID has run out, plus the Increased Memory Limit capability),
+`downloadTeamProvisioningProfile`, and misagent over the RPPairing tunnel with
+its pairing file. Because a re-registered App ID has no app group, `si_sign_ipa`
+takes an `app_group` flag and Madeira is signed without one; otherwise its later
+profiles would grant less than its signature claims. When Apple rejects the
+token (expiry, or a password change), Madeira says to install again, which hands
+over a new one. The token's real lifetime wasn't measured here: Apple states it
+in the token, SideInstaller logs it at sign-in, and Madeira shows it.
+
+The Madeira side is a patch on the fork (branch `sideinstaller-refresh`):
+`SigningRefresh.swift`, one function in its Rust library, docs and checks.
+SideInstaller itself no longer renews anything for Madeira beyond "Refresh all".
+
+Verified on the Mac, 2026-10-11: the downloader against GitHub (tag from the
+redirect, URL, ETag reuse, the version list); `IPALibrary.appInfo` on the real
+`Madeira-0.1.3.ipa`; the vendored signer on that IPA with a test certificate and
+profile (`codesign --verify --deep --strict` passes, bundle ids and task
+identifiers as above, the entitlement present); the hand-over format through
+both apps' code; and Madeira's portal client against a stubbed Apple. Not
+verified, since they need the iPhone and an Apple ID: an install of Madeira,
+Apple granting the capability, Madeira picking up the pairing file and the
+sign-in, and a refresh in Madeira (Apple accepting the handed token, the tunnel,
+misagent accepting the profile).
 
 ## Running on a device (what you do)
 

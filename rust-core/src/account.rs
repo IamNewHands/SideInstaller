@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use base64::{prelude::BASE64_STANDARD, Engine as _};
 use idevice::remote_pairing::RpPairingFile;
 use isideload::{
-    anisette::remote_v3::state::AnisetteState,
+    anisette::remote_v3::{state::AnisetteState, state_key_for},
     auth::apple_account::{TwoFactorCallbackParams, TwoFactorCallbackResponse},
     sideload::{
         builder::MaxCertsBehavior, cert_identity::CertificateIdentity, sideloader::Sideloader,
@@ -125,6 +125,28 @@ pub struct SignSession {
     /// both to look up the signing identity the same way `sign_app` does.
     machine_name: String,
     storage_dir: PathBuf,
+    /// The anisette server signed in through. Each server family keeps its
+    /// own identity, and the hand-offs carry the one this session's token
+    /// was issued to (`state_key_for`).
+    anisette_url: String,
+}
+
+impl SignSession {
+    /// The provisioned anisette identity this session signed in with.
+    fn anisette_state(&self, storage: &FsStorage) -> Result<(AnisetteState, Vec<u8>), String> {
+        let key = state_key_for(storage, &self.anisette_url);
+        let raw = storage
+            .retrieve_data(&key)
+            .map_err(|e| format!("could not read the anisette state: {e}"))?
+            .ok_or("no anisette state stored yet — sign in first")?;
+        let state: AnisetteState = plist::from_bytes(&raw)
+            .map_err(|e| format!("could not parse the anisette state: {e}"))?;
+        let adi_pb = state
+            .adi_pb
+            .clone()
+            .ok_or("this device hasn't been provisioned with the anisette server yet")?;
+        Ok((state, adi_pb))
+    }
 }
 
 // Used only through its own runtime, serialized by Swift on one queue.
@@ -269,6 +291,7 @@ pub unsafe fn apple_signin(
                 sideloader,
                 machine_name,
                 storage_dir: PathBuf::from(&storage_dir),
+                anisette_url,
             });
             *out_session = Box::into_raw(session);
             *out_summary = cstr(summary);
@@ -297,12 +320,15 @@ pub unsafe fn apple_signin(
 ///
 /// # Safety
 /// `session` must be a valid pointer from `apple_signin`; out pointers valid.
+#[allow(clippy::too_many_arguments)]
 pub unsafe fn sign_ipa(
     session: *mut SignSession,
     ipa_path: *const c_char,
     udid: *const c_char,
     device_name: *const c_char,
     pairing_file_path: *const c_char,
+    increased_memory_limit: bool,
+    app_group: bool,
     out_signed_path: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> i32 {
@@ -342,7 +368,8 @@ pub unsafe fn sign_ipa(
                 .sign_app(
                     PathBuf::from(&ipa_path),
                     None,
-                    false,
+                    increased_memory_limit,
+                    app_group,
                     device,
                     pairing_file.as_deref(),
                 )
@@ -443,17 +470,10 @@ pub unsafe fn account_config(
 
         // SideStore wants the same two values isideload hands the anisette
         // server, encoded the same way: base64 of the 16 identifier bytes, and
-        // base64 of the provisioned adi.pb.
+        // base64 of the provisioned adi.pb. They're the identity this session
+        // signed in with, which Apple has just seen pass its second factor.
         let (anisette_identifier, anisette_adi_blob) = {
-            let raw = storage
-                .retrieve_data("anisette_state")
-                .map_err(|e| format!("could not read the anisette state: {e}"))?
-                .ok_or("no anisette state stored yet — sign in first")?;
-            let state: AnisetteState = plist::from_bytes(&raw)
-                .map_err(|e| format!("could not parse the anisette state: {e}"))?;
-            let adi_pb = state
-                .adi_pb
-                .ok_or("this device hasn't been provisioned with the anisette server yet")?;
+            let (state, adi_pb) = session.anisette_state(&storage)?;
             (
                 BASE64_STANDARD.encode(state.keychain_identifier),
                 BASE64_STANDARD.encode(adi_pb),
@@ -523,6 +543,79 @@ pub unsafe fn account_config(
         }
         Err(_) => {
             *out_error = cstr("panic while building the account config");
+            2
+        }
+    }
+}
+
+/// The sign-in an app needs to renew its own provisioning profile, as Swift
+/// decodes it: the developer-portal token, the account it belongs to and the
+/// anisette identity it was issued to. No password.
+#[derive(Serialize)]
+struct SigningAccount {
+    team_id: String,
+    adsid: String,
+    token: String,
+    /// Unix seconds of the token's expiry as Apple stated it; 0 if it gave none.
+    token_expires: u64,
+    /// The identity's 16 bytes and its provisioning (`adi.pb`), base64-encoded.
+    anisette_identifier: String,
+    anisette_adi_pb: String,
+}
+
+/// Set `*out_json` to the [`SigningAccount`] this session is signed in with,
+/// for Madeira, which then asks Apple for its own profiles (the way SideStore
+/// refreshes from a stored token). Reads what the session and the anisette
+/// state already hold: nothing is asked of Apple.
+///
+/// # Safety
+/// `session` must be a valid pointer from `apple_signin`; out pointers valid.
+pub unsafe fn signing_account(
+    session: *mut SignSession,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> i32 {
+    if session.is_null() {
+        *out_error = cstr("null session");
+        return 2;
+    }
+    let session = &mut *session;
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
+        let storage = FsStorage::new(session.storage_dir.clone());
+        let (state, adi_pb) = session.anisette_state(&storage)?;
+
+        session.rt.block_on(async {
+            let team = session
+                .sideloader
+                .get_team()
+                .await
+                .map_err(|e| format!("get_team: {}", report_text(&e)))?;
+            let dev = session.sideloader.get_dev_session();
+            let token = dev.token();
+            serde_json::to_string(&SigningAccount {
+                team_id: team.team_id,
+                adsid: dev.adsid().to_string(),
+                token: token.token.clone(),
+                token_expires: apple_session::stated_expiry(token.expiry).unwrap_or(0),
+                anisette_identifier: BASE64_STANDARD.encode(state.keychain_identifier),
+                anisette_adi_pb: BASE64_STANDARD.encode(adi_pb),
+            })
+            .map_err(|e| format!("serialize the signing account: {e}"))
+        })
+    }));
+
+    match result {
+        Ok(Ok(json)) => {
+            *out_json = cstr(json);
+            0
+        }
+        Ok(Err(e)) => {
+            *out_error = cstr(e);
+            1
+        }
+        Err(_) => {
+            *out_error = cstr("panic while reading the signing account");
             2
         }
     }
@@ -730,5 +823,36 @@ mod altstore_pairing_file_tests {
         assert_eq!(altstore_pairing_file(file.path()), None);
         assert_eq!(altstore_pairing_file(""), None);
         assert_eq!(altstore_pairing_file("/nonexistent/pairing.plist"), None);
+    }
+}
+
+#[cfg(test)]
+mod signing_account_tests {
+    use super::*;
+
+    /// The shape `MadeiraSigningHandoff.plist(from:)` reads in the app.
+    #[test]
+    fn serializes_as_the_json_swift_reads() {
+        let account = SigningAccount {
+            team_id: "TEAM123456".into(),
+            adsid: "000123-08-abcdef".into(),
+            token: "AAAABLwIAAAAAGW".into(),
+            token_expires: 1_800_000_000,
+            anisette_identifier: BASE64_STANDARD.encode([7u8; 16]),
+            anisette_adi_pb: BASE64_STANDARD.encode([9u8; 3]),
+        };
+        let json: serde_json::Value =
+            serde_json::from_str(&serde_json::to_string(&account).unwrap()).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "team_id": "TEAM123456",
+                "adsid": "000123-08-abcdef",
+                "token": "AAAABLwIAAAAAGW",
+                "token_expires": 1_800_000_000u64,
+                "anisette_identifier": "BwcHBwcHBwcHBwcHBwcHBw==",
+                "anisette_adi_pb": "CQkJ",
+            })
+        );
     }
 }

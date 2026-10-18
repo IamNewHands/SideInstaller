@@ -14,6 +14,7 @@ let vietnameseStrings: [String: String] = [
     "Password": "Mật khẩu",
     "Install": "Cài ứng dụng",
     "Installing": "Đang cài đặt",
+    "Cancelling": "Đang hủy",
     "Installed": "Đã cài đặt",
     "Something went wrong": "Đã xảy ra lỗi",
     "an app by Frizzle": "một ứng dụng của Frizzle",
@@ -148,6 +149,7 @@ let vietnameseStrings: [String: String] = [
     "No": "Không",
     "Closing this popup will end the process. Are you sure?":
         "Đóng cửa sổ này sẽ dừng quá trình. Bạn có chắc không?",
+    "Cancel the install?": "Hủy cài đặt?",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ đã được cài đặt. Hoàn tất bước tin cậy ở trên để mở ứng dụng.",
     "%@ is installed. Finish the trust step below to open it.":
@@ -472,7 +474,7 @@ let vietnameseStrings: [String: String] = [
     "Tunnel": "Đường hầm",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "Có thứ gì đó ở %@:%d đã từ chối kết nối, nghĩa là đường hầm vẫn thông — chỉ là thiết bị không lắng nghe trên cổng ghép nối của nó. Cổng đó chỉ mở khi bật Chế độ nhà phát triển, và iOS hỏi lại sau mỗi lần khởi động lại: hãy bật trong Cài đặt › Quyền riêng tư & Bảo mật › Chế độ nhà phát triển rồi thử lại. Nếu đã bật, hãy ghép nối lại iPhone này trong “Tệp ghép nối”.",
-    "Start LocalDevVPN on launch": "Khởi động LocalDevVPN khi mở app",
+    "Start LocalDevVPN when needed": "Khởi động LocalDevVPN khi cần",
     "Start LocalDevVPN now": "Khởi động LocalDevVPN ngay",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "Chưa cài LocalDevVPN. Hãy tải từ App Store, rồi SideInstaller có thể khởi động giúp bạn.",
@@ -518,6 +520,8 @@ let vietnameseStrings: [String: String] = [
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "GitHub đang giới hạn số yêu cầu từ mạng này — GitHub không bị chặn, và giới hạn sẽ tự hết. Hãy thử lại %@.",
     "GitHub answered HTTP %d%@": "GitHub đã trả về HTTP %d%@",
+    "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
+        "GitHub hiện không cung cấp %@ — kho mã đã bị gỡ, chuyển đi hoặc chuyển thành riêng tư nên không có gì để tải. iPhone này và mạng của nó không có vấn đề gì.",
     "couldn't reach GitHub: %@": "không kết nối được tới GitHub: %@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
         "phản hồi của GitHub không phải là thông tin bản phát hành (%@) — có thể thứ gì đó trên mạng này đã thay thế nó.",
@@ -608,6 +612,13 @@ let vietnameseStrings: [String: String] = [
         "Hoặc chép tệp vào Tệp › Trên iPhone của tôi › SideInstaller — SideInstaller cũng tìm thấy ở đó.",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "Đây là lối đi ở những nơi GitHub bị chặn: tải IPA trên bất kỳ thiết bị nào, mang sang đây rồi cài đặt.",
+    "Bring the .ipa yourself": "Tự mang tệp .ipa đến",
+    "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
+        "Không thể tải %@ khi kho mã của nó trên GitHub đang ngoại tuyến. Các ứng dụng khác vẫn cài được như bình thường.",
+    "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
+        "Để vẫn cài được, hãy lấy tệp .ipa của nó từ một nguồn bạn tin cậy, đặt tên là %@ rồi chép vào Tệp › Trên iPhone của tôi › SideInstaller.",
+    "Then tap Install again — SideInstaller uses your file instead of downloading one.":
+        "Sau đó chạm vào Cài ứng dụng lần nữa — SideInstaller sẽ dùng tệp của bạn thay vì tải về.",
     "Pair this iPhone in Settings": "Ghép nối iPhone này trong Cài đặt",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "Mở ứng dụng Cài đặt, rồi vào Quyền riêng tư & Bảo mật › Chế độ nhà phát triển.",
@@ -615,6 +626,17 @@ let vietnameseStrings: [String: String] = [
     "Enter your iPhone’s passcode if it asks for it.": "Nhập mật mã iPhone của bạn nếu được hỏi.",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "Quay lại SideInstaller, xem mã mà ứng dụng hiển thị, rồi nhập đúng mã đó vào hộp thoại trong Cài đặt.",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "Nhập mã hiện ở đầu màn hình vào hộp thoại trong Cài đặt. Nếu không thấy mã, hãy quay lại SideInstaller để xem.",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "Hãy cho phép thông báo khi SideInstaller hỏi: mã ghép nối sẽ đến với bạn trong Cài đặt bằng cách đó.",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "Quyền riêng tư & Bảo mật › Chế độ nhà phát triển › Ghép nối với SideInstaller",
+    "Paired": "Đã ghép nối",
+    "Tap to return to SideInstaller.": "Chạm để quay lại SideInstaller.",
+
     "A signing certificate already exists": "Đã có một chứng chỉ ký",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple trả về lỗi 7460: Apple ID này đã có chứng chỉ phát triển iOS, hoặc một yêu cầu vẫn đang chờ xử lý.",
@@ -652,6 +674,16 @@ let vietnameseStrings: [String: String] = [
         "Apple chỉ cho người lớn dùng dịch vụ dành cho nhà phát triển mà SideInstaller dùng để ký ứng dụng, và Apple cho biết Apple Account này thuộc về người chưa đủ tuổi (lỗi 1102).",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "Hãy đăng nhập bằng Apple Account của một người lớn: mở Cài đặt › Tài khoản và thêm tài khoản đó vào.",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "Apple không cho Apple Account này dùng dịch vụ dành cho nhà phát triển cho đến khi địa chỉ email của tài khoản được xác minh (lỗi 2160). Hãy xác minh tại account.apple.com rồi thử lại.",
+    "Verify your Apple Account's email":
+        "Xác minh email của Apple Account",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "Apple không cho Apple Account này ký ứng dụng cho đến khi địa chỉ email của tài khoản được xác minh (lỗi 2160). Đăng nhập lại hay dùng máy chủ anisette khác cũng không thay đổi được điều đó.",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "Đăng nhập account.apple.com bằng Apple Account này và xác minh địa chỉ email khi Apple yêu cầu. Apple gửi mã hoặc liên kết đến địa chỉ đó, nên hãy kiểm tra cả thư mục thư rác.",
+    "Open Apple Account":
+        "Mở Apple Account",
     "No App IDs left this week": "Đã hết App ID trong tuần này",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "Mỗi ứng dụng và tiện ích mở rộng mà SideInstaller ký đều cần một App ID. Apple ID miễn phí chỉ đăng ký được 10 App ID mỗi tuần, và mỗi App ID được tính trong 7 ngày.",
@@ -740,6 +772,18 @@ let vietnameseStrings: [String: String] = [
     "Links": "Liên kết",
     "Source code": "Mã nguồn",
     "Support the project": "Ủng hộ dự án",
+    "Crypto": "Tiền mã hóa",
+    "Donation wallets for Bitcoin, Ethereum and Solana.":
+        "Ví nhận ủng hộ cho Bitcoin, Ethereum và Solana.",
+    "Crypto donations": "Ủng hộ bằng tiền mã hóa",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "Việc ủng hộ hoàn toàn là tự nguyện. Khoản ủng hộ không dùng để mua gì, không mở khóa tính năng nào và bạn không nhận lại gì cả; đó chỉ là một cách để cảm ơn nếu SideInstaller đã giúp ích cho bạn.",
+    "Coin": "Đồng tiền",
+    "Network: %@": "Mạng: %@",
+    "QR code for the %@ address": "Mã QR của địa chỉ %@",
+    "Copied": "Đã sao chép",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "Chỉ gửi mỗi đồng tiền qua đúng mạng được ghi. Tiền mã hóa gửi qua mạng khác sẽ không thể khôi phục.",
 
     "Special thanks": "Lời cảm ơn đặc biệt",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -767,4 +811,22 @@ let vietnameseStrings: [String: String] = [
         "Chỉ những bản dựng trên trang cài đặt và kho mã chính thức mới là của tôi. Bất kỳ ai cũng có thể fork mã nguồn, thêm mã đánh cắp thông tin đăng nhập rồi phát hành với cùng tên và biểu tượng — vì vậy đừng giao Apple ID của bạn cho một bản sao lấy từ nơi khác.",
     "Install page": "Trang cài đặt",
     "Terms": "Điều khoản",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.":
+        "%@ cần iOS %d trở lên. iPhone này đang chạy iOS %@.",
+    "Open Madeira from your Home Screen.": "Mở Madeira từ Màn hình chính.",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "Trong phần thiết lập của nó, ở mục “Set up JIT”, chọn “In-app with pairing file”: SideInstaller đã đặt sẵn tệp ở đó, nên hãy chạm vào “Continue”.",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "Trong phần thiết lập của nó, ở mục “Set up JIT”, chọn cách iPhone này có JIT.",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "Từ giờ Madeira tự gia hạn chữ ký của mình, khi nó đang mở và LocalDevVPN đang kết nối. SideInstaller đã cấp cho nó một phiên đăng nhập để làm việc đó: một token cho dịch vụ nhà phát triển của Apple, không phải mật khẩu của bạn. Madeira có thể xoá nó trong Settings › Signing.",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "Chữ ký của nó có hiệu lực 7 ngày. Trước khi hết hạn, hãy gia hạn tại đây trong Công cụ › Ứng dụng sideload.",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "Tệp ghép nối này không có bản ghi RPPairing, loại duy nhất mà %@ đọc được.",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Chạy game PC Windows trên iPhone của bạn. Của Will Faust, giấy phép GPL-3.0.",
 ]

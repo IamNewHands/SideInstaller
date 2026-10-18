@@ -14,6 +14,7 @@ let japaneseStrings: [String: String] = [
     "Password": "パスワード",
     "Install": "インストール",
     "Installing": "インストール中",
+    "Cancelling": "キャンセル中",
     "Installed": "インストール済み",
     "Something went wrong": "問題が発生しました",
     "an app by Frizzle": "Frizzle 制作のアプリ",
@@ -146,6 +147,7 @@ let japaneseStrings: [String: String] = [
     "No": "いいえ",
     "Closing this popup will end the process. Are you sure?":
         "このポップアップを閉じると処理が終了します。よろしいですか？",
+    "Cancel the install?": "インストールをキャンセルしますか？",
     "%@ is installed. Finish the trust step above to open it.":
         "%@ はインストールされています。上記の信頼手順を完了すると開けます。",
     "%@ is installed. Finish the trust step below to open it.":
@@ -376,7 +378,7 @@ let japaneseStrings: [String: String] = [
     "Tunnel": "トンネル",
     "Something at %@:%d refused the connection, so the tunnel is carrying traffic — the device just isn't listening on its pairing port. That port only opens while Developer Mode is on, and iOS asks for it again after every restart: turn it on under Settings › Privacy & Security › Developer Mode, then try again. If it's already on, pair this iPhone again under “Pairing file”.":
         "%@:%d で接続が拒否されました。トンネルは通っていて、デバイスがペアリング用のポートで待ち受けていないだけです。このポートはデベロッパモードが有効なときだけ開き、再起動のたびに iOS が確認を求めます。「設定 › プライバシーとセキュリティ › デベロッパモード」で有効にしてから、もう一度お試しください。すでに有効な場合は、「ペアリングファイル」からこの iPhone をペアリングし直してください。",
-    "Start LocalDevVPN on launch": "起動時に LocalDevVPN を開始",
+    "Start LocalDevVPN when needed": "必要なときに LocalDevVPN を開始",
     "Start LocalDevVPN now": "今すぐ LocalDevVPN を開始",
     "LocalDevVPN isn't installed. Get it from the App Store, and this can start it for you.":
         "LocalDevVPN がインストールされていません。App Store から入手すると、SideInstaller が起動できるようになります。",
@@ -422,6 +424,8 @@ let japaneseStrings: [String: String] = [
     "GitHub is rate-limiting this network — it isn't blocked, and the limit clears itself. Try again %@.":
         "このネットワークからのアクセスが GitHub によりレート制限されています。ブロックされているわけではなく、制限は自動的に解除されます。%@ 後に再度お試しください。",
     "GitHub answered HTTP %d%@": "GitHub の応答：HTTP %d%@",
+    "GitHub isn't serving %@ right now — the repository has been taken down, moved or made private, so there's nothing to download. Nothing is wrong with this iPhone or its network.":
+        "GitHub は現在 %@ を提供していません。リポジトリが削除、移動、または非公開にされたため、ダウンロードできるものがありません。この iPhone やネットワークに問題はありません。",
     "couldn't reach GitHub: %@": "GitHub に接続できませんでした：%@",
     "GitHub's answer wasn't release information (%@) — something on this network may have replaced it.":
         "GitHub の応答がリリース情報ではありませんでした（%@）。このネットワーク上の何かが内容を置き換えている可能性があります。",
@@ -511,6 +515,13 @@ let japaneseStrings: [String: String] = [
         "あるいは「ファイル › このiPhone内 › SideInstaller」にコピーしておいても、SideInstaller が見つけられます。",
     "This is the way in where GitHub is blocked: fetch the IPA on any device, bring it over, and install it here.":
         "GitHub がブロックされている環境では、この方法が有効です。別のデバイスで IPA を取得し、こちらに持ってきてインストールしてください。",
+    "Bring the .ipa yourself": ".ipa を自分で用意する",
+    "%@ can't be downloaded while its GitHub repository is offline. The other apps still install as usual.":
+        "GitHub リポジトリがオフラインの間、%@ はダウンロードできません。ほかのアプリは通常どおりインストールできます。",
+    "To install it anyway, get its .ipa from somewhere you trust, name it %@, and copy it into Files › On My iPhone › SideInstaller.":
+        "それでもインストールするには、信頼できる入手先から .ipa を入手し、名前を %@ にして「ファイル › このiPhone内 › SideInstaller」にコピーしてください。",
+    "Then tap Install again — SideInstaller uses your file instead of downloading one.":
+        "その後、もう一度「インストール」をタップしてください。SideInstaller はダウンロードの代わりにそのファイルを使います。",
     "Pair this iPhone in Settings": "「設定」でこの iPhone をペアリング",
     "Open the Settings app, then go to Privacy & Security › Developer Mode.":
         "「設定」アプリを開き、「プライバシーとセキュリティ › デベロッパモード」に進んでください。",
@@ -518,6 +529,17 @@ let japaneseStrings: [String: String] = [
     "Enter your iPhone’s passcode if it asks for it.": "パスコードの入力を求められた場合は、iPhone のパスコードを入力してください。",
     "Come back to SideInstaller, read the code it shows you, then type that same code into the prompt in Settings.":
         "SideInstaller に戻り、表示されているコードを確認したら、同じコードを「設定」のダイアログに入力してください。",
+    "Type the code that appears at the top of the screen into the prompt in Settings. If none appears, come back to SideInstaller to read it.":
+        "画面上部に表示されるコードを「設定」のダイアログに入力してください。表示されない場合は、SideInstaller に戻ってコードを確認してください。",
+    "Allow notifications when SideInstaller asks: that's how the pairing code reaches you in Settings.":
+        "SideInstaller から求められたら通知を許可してください。ペアリングコードは通知で「設定」の上に表示されます。",
+
+    // The pairing Live Activity
+    "Privacy & Security › Developer Mode › Pair with SideInstaller":
+        "プライバシーとセキュリティ › デベロッパモード › SideInstaller とペアリング",
+    "Paired": "ペアリング完了",
+    "Tap to return to SideInstaller.": "タップして SideInstaller に戻ります。",
+
     "A signing certificate already exists": "既に署名用証明書が存在します",
     "Apple returned error 7460: this Apple ID already has an iOS development certificate, or a request for one is still pending.":
         "Apple からエラー 7460 が返されました。この Apple ID には既に iOS 開発用証明書が存在するか、発行のリクエストが処理中です。",
@@ -554,6 +576,16 @@ let japaneseStrings: [String: String] = [
         "SideInstaller がアプリの署名に使うデベロッパサービスを Apple は成人にしか許可しておらず、この Apple アカウントは未成年のものだと報告しています（エラー 1102）。",
     "Sign in with an adult's Apple Account instead: open Settings › Account and add it there.":
         "代わりに成人の Apple アカウントでサインインしてください：「設定 › アカウント」を開いて追加します。",
+    "Apple won't let this Apple Account use developer services until its email address is verified (error 2160). Verify it at account.apple.com, then try again.":
+        "メールアドレスの確認が済むまで、Apple はこの Apple アカウントでのデベロッパサービスの利用を許可しません（エラー 2160）。account.apple.com で確認してから、もう一度お試しください。",
+    "Verify your Apple Account's email":
+        "Apple アカウントのメールアドレスを確認",
+    "Apple won't let this Apple Account sign apps until its email address is verified (error 2160). Signing in again or through another anisette server won't change that.":
+        "メールアドレスの確認が済むまで、Apple はこの Apple アカウントでのアプリへの署名を許可しません（エラー 2160）。サインインし直しても、別の anisette サーバーを使っても変わりません。",
+    "Sign in at account.apple.com with this Apple Account and verify its email address when Apple asks. Apple sends the code or link to that address, so check its spam folder too.":
+        "この Apple アカウントで account.apple.com にサインインし、Apple に求められたらメールアドレスを確認してください。確認コードまたはリンクはそのアドレスに届くので、迷惑メールフォルダも確認してください。",
+    "Open Apple Account":
+        "Apple アカウントを開く",
     "No App IDs left this week": "今週使える App ID がありません",
     "Every app and app extension SideInstaller signs needs an App ID. A free Apple ID can register 10 a week, and each one counts for 7 days.":
         "SideInstaller が署名するアプリとアプリ拡張機能には、それぞれ App ID が必要です。無料の Apple ID で登録できるのは週に 10 個までで、それぞれ 7 日間カウントされます。",
@@ -726,6 +758,18 @@ let japaneseStrings: [String: String] = [
     "Links": "リンク",
     "Source code": "ソースコード",
     "Support the project": "プロジェクトを支援",
+    "Crypto": "暗号資産",
+    "Donation wallets for Bitcoin, Ethereum and Solana.":
+        "Bitcoin・Ethereum・Solana の寄付用ウォレット。",
+    "Crypto donations": "暗号資産での寄付",
+    "Donations are entirely optional. They don't buy anything, unlock any feature or get you anything in return; they're just a way to say thanks if SideInstaller has helped you.":
+        "寄付は完全に任意です。何かを購入したり、機能が解放されたり、見返りがあったりするものではありません。SideInstaller が役に立ったときに感謝を伝えるための手段です。",
+    "Coin": "通貨",
+    "Network: %@": "ネットワーク：%@",
+    "QR code for the %@ address": "%@ アドレスの QR コード",
+    "Copied": "コピーしました",
+    "Send each coin only on the network shown. Crypto sent on another network can't be recovered.":
+        "各通貨は表示されたネットワークでのみ送金してください。別のネットワークで送金した暗号資産は取り戻せません。",
 
     "Special thanks": "特別な感謝",
     "For idevice, the library SideInstaller talks to your iPhone through. None of this exists without it.":
@@ -752,4 +796,21 @@ let japaneseStrings: [String: String] = [
         "公式のインストールページとリポジトリにあるビルドのみが本物です。誰でもソースコードを fork し、認証情報を盗むコードを仕込んで、同じ名前とアイコンで配布することができます。そのため、他所から入手したコピーに Apple ID を入力しないでください。",
     "Install page": "インストールページ",
     "Terms": "利用規約",
+
+    // MARK: - Madeira
+
+    "%@ needs iOS %d or later. This iPhone runs iOS %@.": "%@ には iOS %d 以降が必要です。この iPhone は iOS %@ です。",
+    "Open Madeira from your Home Screen.": "ホーム画面から Madeira を開いてください。",
+    "In its setup, under “Set up JIT”, pick “In-app with pairing file”: SideInstaller already put the file there, so tap “Continue”.":
+        "初期設定の「Set up JIT」で「In-app with pairing file」を選んでください。ファイルは SideInstaller がすでに入れてあるので、「Continue」をタップします。",
+    "In its setup, under “Set up JIT”, pick how this iPhone gets JIT.":
+        "初期設定の「Set up JIT」で、この iPhone で JIT を使う方法を選んでください。",
+    "Madeira renews its own signing from now on, when it's open and LocalDevVPN is connected. SideInstaller gave it a sign-in for that: a token for Apple's developer service, not your password. Madeira can forget it under Settings › Signing.":
+        "今後は、Madeira を開いていて LocalDevVPN が接続されているときに、Madeira が自分で署名を更新します。そのために SideInstaller がサインイン情報を渡しました。Apple の開発者サービス用のトークンで、パスワードではありません。Madeira の Settings › Signing で削除できます。",
+    "Its signing lasts 7 days. Before they run out, refresh it here under Tools › Sideloaded apps.":
+        "署名の有効期間は7日間です。期限が切れる前に、このアプリの「ツール › サイドロード済みアプリ」で更新してください。",
+    "This pairing file has no RPPairing record, the only kind %@ reads.":
+        "このペアリングファイルには、%@ が読み取れる唯一の形式である RPPairing レコードがありません。",
+    "Runs Windows PC games on your iPhone. By Will Faust, GPL-3.0.":
+        "Windows 向け PC ゲームを iPhone で動かします。Will Faust 開発、GPL-3.0 ライセンス。",
 ]

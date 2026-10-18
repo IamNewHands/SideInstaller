@@ -25,6 +25,7 @@ endpoints reject the plausible-looking alternative.
 import base64
 import binascii
 import getpass
+import gzip
 import hashlib
 import hmac
 import http.client
@@ -63,11 +64,19 @@ DEV_HOST = "developerservices2.apple.com"
 DEV_CLIENT_ID = "XABBG36SBA"
 DEV_PROTOCOL = "QH65B2"
 
-DEFAULT_ANISETTE = os.environ.get("ANISETTE_URL", "https://ani.sidestore.io")
+# The app's defaults (AnisetteServer.fallback / .legacyDefault): jkcoxson's
+# server on Apple's Windows ADI library for a first run, and the old default
+# for anyone with an anisette identity from before, so they keep it (see
+# default_anisette).
+FALLBACK_ANISETTE = "https://ani.jkcoxson.com"
+LEGACY_ANISETTE = "https://ani.sidestore.io"
 # Same live list the app reads, with the same bundled fallback, so a server
 # going down here fails over exactly the way it does in SideInstaller.
 ANISETTE_LIST_URL = "https://servers.sidestore.io/servers.json"
 BUNDLED_ANISETTE = [
+    "https://ani.jkcoxson.com",
+    "https://win.ani.sidestore.io",
+    "https://ani2.stikstore.app",
     "https://ani.sidestore.io",
     "https://ani.sidestore.app",
     "https://ani.sidestore.zip",
@@ -76,7 +85,14 @@ BUNDLED_ANISETTE = [
     "https://anisette.wedotstud.io",
     "https://ani.neoarz.com",
     "https://ani.jaydenha.uk",
+    "https://mac-ani.jkcoxson.com",
+    "https://new.ani.sidestore.io",
 ]
+# Servers known to run Apple's macOS and Windows ADI libraries (the app's
+# AnisetteServer.macADIHosts / .windowsADIHosts). The Windows ones are tried
+# right after the preferred one, the macOS ones last (see anisette_candidates).
+MAC_ADI_HOSTS = ("mac-ani.jkcoxson.com", "new.ani.sidestore.io")
+WINDOWS_ADI_HOSTS = ("ani.jkcoxson.com", "win.ani.sidestore.io", "ani2.stikstore.app")
 # Anisette servers are volunteer-run and half of any list is usually down;
 # stop after this many so a bad day doesn't turn into a long wait.
 MAX_ANISETTE_TRIES = 6
@@ -206,6 +222,9 @@ def request(method, url, headers=None, body=None, timeout=60, redirects=5):
         data = response.read()
         status = response.status
         got = {k.lower(): v for k, v in response.getheaders()}
+        # The developer portal gzips its replies whatever Accept-Encoding says.
+        if got.get("content-encoding", "").lower() == "gzip":
+            data = gzip.decompress(data)
     finally:
         conn.close()
 
@@ -456,6 +475,15 @@ def _sha256(*chunks):
     return digest.digest()
 
 
+def loads_bare_plist(data):
+    """plistlib.loads for what GrandSlam encrypts (the sign-in response, app
+    tokens): a bare <dict>, which plistlib only reads inside a <plist>."""
+    data = data.strip()
+    if data.startswith(b"<dict"):
+        data = b'<plist version="1.0">' + data + b"</plist>"
+    return plistlib.loads(data)
+
+
 class SRPClient:
     def __init__(self):
         self.n_bytes = _trim(SRP_N)
@@ -511,7 +539,7 @@ class SRPClient:
             key = hmac.new(base, b"extra data key:", hashlib.sha256).digest()
             iv = hmac.new(base, b"extra data iv:", hashlib.sha256).digest()[:16]
             try:
-                return plistlib.loads(aes_cbc_decrypt(key, iv, blob))
+                return loads_bare_plist(aes_cbc_decrypt(key, iv, blob))
             except Exception as exc:  # noqa: BLE001 - any failure means "wrong key"
                 errors.append("%s: %s" % (label, exc))
         raise Fail("Could not decrypt the sign-in response (%s)." % "; ".join(errors))
@@ -638,46 +666,165 @@ class WebSocket:
 # mints headers from the stored blob; v1 just returns a header set per request.
 # ----------------------------------------------------------------------------
 
-# What we tell GrandSlam we are, whatever the anisette server suggests. Public
-# servers still hand out a com.apple.dt.Xcode client info, and since September
-# 2026 Apple's GSA edge answers any request carrying one with HTTP 503 before
-# reading the rest. isideload, AltStore and SideSign all switched to akd.
-GSA_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+# What we tell GrandSlam we are when the anisette server's own client info
+# can't be used (client_info_to_use): a Windows PC, as iTunes reports it.
+# Since 2026-10-12 GrandSlam refuses a Mac with -80045 ("This action cannot be
+# completed at this time") on servers that make anisette data with Apple's
+# Android ADI library, and since 2026-10-15 it answers the Android phone used
+# in between with HTTP 503. The Windows PC gets through on those servers too,
+# and it is what the servers on the Windows ADI library hand out themselves
+# (those need the resync in AppleAccount._init).
+GSA_CLIENT_INFO = "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>"
 GSA_USER_AGENT = "akd/1.0 CFNetwork/808.1.4"
+# Device and OS of the stock client info of anisette-v3-server and of
+# AltServer/omnisette. Servers hand these out whatever library they run, and
+# every public server that does runs Apple's Android ADI library; most also
+# name com.apple.dt.Xcode, which Apple's GSA edge has answered with HTTP 503
+# since September 2026.
+STOCK_CLIENTS = ("<MacBookPro13,2> <macOS;13.1;22C65>", "<MacBookPro15,1> <Mac OS X;10.15.2;19C57>")
+# What two kinds of request fall back to when Apple won't take them from the
+# client above: a Mac. The URL bag: asked as an Android phone, the lookup
+# answered with ten URLs on gsd.apple.com; as a Mac, with the full bag on
+# gsa.apple.com, where the other URLs in this script live. And the
+# second-factor pages under gsa.apple.com/auth, which answered the Android
+# phone with a bare 403. The Windows PC gets the full bag and reaches the
+# token check on /auth, so both are asked as it, like the rest of sign-in.
+GSA_MAC_CLIENT_INFO = "<Mac15,7> <macOS;27.0;26A5378j> <com.apple.AuthKit/1 (com.apple.akd/1.0)>"
+# The URL-bag entries this script uses.
+GSA_BAG_KEYS = ("gsService", "midStartProvisioning", "midFinishProvisioning",
+                "trustedDeviceSecondaryAuth", "secondaryAuth", "validateCode")
+
+
+def client_info_to_use(client_info, user_agent):
+    """The (client info, user agent) to tell GrandSlam, given what a server
+    hands out: its own, unless it's a stock one or an Android phone's."""
+    client_info = (client_info or "").strip()
+    if (not client_info or client_info.startswith(STOCK_CLIENTS)
+            or "<Android;" in client_info):
+        return GSA_CLIENT_INFO, GSA_USER_AGENT
+    return client_info, (user_agent or "").strip() or GSA_USER_AGENT
+
+
+class NotProvisioned(Fail):
+    """The anisette server isn't provisioned with this identity (ADI error
+    -45061): it was made on another ADI library, or the server lost it."""
 
 
 class Anisette:
+    """One anisette server, and the identity used with it.
+
+    An identity is provisioned through one server and works with every server
+    on the same ADI library; servers on another library answer it with -45061.
+    So one identity is kept per library, as the app does (isideload's
+    anisette_slots.json): `state_path` holds the first, the others sit next to
+    it (anisette-2.json, …), and anisette-servers.json remembers which one each
+    server took. A new identity is a new machine to Apple, which asks for the
+    second factor again."""
+
     def __init__(self, url, state_path):
         self.url = url.rstrip("/")
         self.state_path = state_path
+        self.state_dir = os.path.dirname(state_path)
+        self.slots_path = os.path.join(self.state_dir, "anisette-servers.json")
         self.version = None
         self.client_info = GSA_CLIENT_INFO
         self.user_agent = GSA_USER_AGENT
         self.routing_info = "0"
-        self.identifier = None
+        self.identity = None
+        self.identifier = secrets.token_bytes(16)
         self.adi_pb = None
-        self._load()
 
-    # -- persisted identity ---------------------------------------------------
+    # -- persisted identities -------------------------------------------------
 
-    def _load(self):
+    def _identity_path(self, name):
+        return os.path.join(self.state_dir, name)
+
+    def _read_identity(self, name):
+        """(identifier, adi_pb) stored as `name`, or None if not provisioned."""
         try:
-            with open(self.state_path) as handle:
+            with open(self._identity_path(name)) as handle:
                 saved = json.load(handle)
-            self.identifier = base64.b64decode(saved["identifier"])
             if saved.get("adi_pb"):
-                self.adi_pb = base64.b64decode(saved["adi_pb"])
-        except (OSError, ValueError, KeyError):
-            self.identifier = secrets.token_bytes(16)
+                return base64.b64decode(saved["identifier"]), base64.b64decode(saved["adi_pb"])
+        except (OSError, ValueError, KeyError, binascii.Error):
+            pass
+        return None
 
     def _save(self):
-        os.makedirs(os.path.dirname(self.state_path), exist_ok=True)
+        path = self._identity_path(self.identity)
+        os.makedirs(self.state_dir, exist_ok=True)
         payload = {"identifier": base64.b64encode(self.identifier).decode()}
         if self.adi_pb:
             payload["adi_pb"] = base64.b64encode(self.adi_pb).decode()
-        with open(self.state_path, "w") as handle:
+        with open(path, "w") as handle:
             json.dump(payload, handle)
-        os.chmod(self.state_path, 0o600)
+        os.chmod(path, 0o600)
+
+    def _read_slots(self):
+        try:
+            with open(self.slots_path) as handle:
+                slots = json.load(handle)
+            return {"servers": dict(slots.get("servers", {})), "used": dict(slots.get("used", {})),
+                    "last": slots.get("last")}
+        except (OSError, ValueError, AttributeError):
+            return {"servers": {}, "used": {}, "last": None}
+
+    def _use(self, slots, name, identifier, adi_pb):
+        self.identity, self.identifier, self.adi_pb = name, identifier, adi_pb
+        slots["servers"][self.url] = name
+        slots["used"][name] = int(time.time())
+        slots["last"] = self.url
+        try:
+            os.makedirs(self.state_dir, exist_ok=True)
+            with open(self.slots_path, "w") as handle:
+                json.dump(slots, handle)
+        except OSError as exc:
+            warn("Couldn't save which anisette identity this server takes: %s" % exc)
+
+    def select_identity(self, gs, rejected=None):
+        """Pick the identity for this server: the one it took last time, else
+        the first stored one it takes, else a new one provisioned through it.
+        `rejected` names an identity the server has just refused."""
+        legacy = os.path.basename(self.state_path)
+        slots = self._read_slots()
+        if rejected and slots["servers"].get(self.url) == rejected:
+            del slots["servers"][self.url]
+
+        name = slots["servers"].get(self.url)
+        if name and name != rejected:
+            stored = self._read_identity(name)
+            if stored:
+                self._use(slots, name, *stored)
+                return
+
+        names = sorted(slots["used"], key=lambda n: -slots["used"][n])
+        if legacy not in names:
+            names.append(legacy)
+        for name in names:
+            stored = self._read_identity(name)
+            if name == rejected or not stored:
+                continue
+            self.identifier, self.adi_pb = stored
+            try:
+                self.headers()
+            except NotProvisioned:
+                info("Anisette identity %s isn't provisioned with this server." % name)
+                continue
+            self._use(slots, name, *stored)
+            return
+
+        name = legacy
+        n = 2
+        while name in slots["used"] or self._read_identity(name):
+            name = "%s-%d.json" % (legacy.rsplit(".", 1)[0], n)
+            n += 1
+        info("Provisioning a new anisette identity with %s…" % self.url)
+        self.identifier, self.adi_pb = secrets.token_bytes(16), None
+        self.provision(gs)
+        self.headers()  # checked before it's kept
+        self.identity = name
+        self._save()
+        self._use(slots, name, self.identifier, self.adi_pb)
 
     @property
     def device_id(self):
@@ -705,9 +852,10 @@ class Anisette:
                 payload = json.loads(body)
             except ValueError:
                 payload = {}
-            # Only the shape identifies a v3 server; its values are not sent.
             if isinstance(payload, dict) and "client_info" in payload and "user_agent" in payload:
                 self.version = 3
+                self.client_info, self.user_agent = client_info_to_use(
+                    payload.get("client_info"), payload.get("user_agent"))
                 return 3
 
         status, _, body = request("GET", self.url + "/")
@@ -723,13 +871,6 @@ class Anisette:
         raise Fail("%s does not look like an anisette server." % self.url)
 
     # -- v3 provisioning ------------------------------------------------------
-
-    def needs_provisioning(self):
-        return self.version == 3 and not self.adi_pb
-
-    def forget_provisioning(self):
-        self.adi_pb = None
-        self._save()
 
     def provision(self, gs):
         ws_url = self.url.replace("https://", "wss://").replace("http://", "ws://")
@@ -764,7 +905,6 @@ class Anisette:
 
                 elif result == "ProvisioningSuccess":
                     self.adi_pb = base64.b64decode(payload["adi_pb"])
-                    self._save()
                     return
 
                 elif result in ("Timeout", "InvalidIdentifier"):
@@ -778,9 +918,10 @@ class Anisette:
 
     # -- headers --------------------------------------------------------------
 
-    def headers(self):
+    def headers(self, sim=None):
         """The three headers Apple checks, refreshed per request (X-Apple-I-MD
-        is a one-time password and does not survive being reused)."""
+        is a one-time password and does not survive being reused). With `sim`
+        a v3 server first applies the resync data GrandSlam sent with hsc 434."""
         if self.version == 1:
             status, _, body = request("GET", self.url + "/")
             if status != 200:
@@ -793,18 +934,24 @@ class Anisette:
                 "X-Apple-I-MD-M": payload["X-Apple-I-MD-M"],
             }
 
+        payload = {
+            "identifier": base64.b64encode(self.identifier).decode(),
+            "adi_pb": base64.b64encode(self.adi_pb).decode(),
+        }
+        if sim:
+            payload.update(sim=sim, device_id=self.device_id, md_lu=self.md_lu)
         status, _, body = request(
             "POST", self.url + "/v3/get_headers",
             headers={"Content-Type": "application/json"},
-            body=json.dumps({
-                "identifier": base64.b64encode(self.identifier).decode(),
-                "adi_pb": base64.b64encode(self.adi_pb).decode(),
-            }),
+            body=json.dumps(payload),
         )
         payload = self._json(body, "a header request") if body else {}
         if status != 200 or payload.get("result") != "Headers":
-            raise Fail("Anisette server refused to mint headers: %s"
-                       % payload.get("message", "HTTP %d" % status))
+            message = payload.get("message", "HTTP %d" % status)
+            if "-45061" in str(message):
+                raise NotProvisioned("Anisette server isn't provisioned with this identity: %s"
+                                     % message)
+            raise Fail("Anisette server refused to mint headers: %s" % message)
         self.routing_info = payload.get("X-Apple-I-MD-RINFO", "0")
         return {
             "X-Mme-Device-Id": self.device_id,
@@ -812,7 +959,7 @@ class Anisette:
             "X-Apple-I-MD-M": payload["X-Apple-I-MD-M"],
         }
 
-    def client_provided_data(self):
+    def client_provided_data(self, sim=None):
         # These really are the strings "true"/"false", not plist booleans —
         # isideload sends them that way and Apple accepts it.
         cpd = {
@@ -823,7 +970,7 @@ class Anisette:
             "prkgen": "true",
             "svct": "iCloud",
         }
-        cpd.update(self.headers())
+        cpd.update(self.headers(sim))
         return cpd
 
 
@@ -834,10 +981,40 @@ class Anisette:
 class GrandSlam:
     def __init__(self, anisette):
         self.anisette = anisette
-        status, _, body = request("GET", GSA_URL_BAG, headers=self.base_headers())
+        # The pages under /auth turned the client away with a bare 403, so
+        # they're asked as a Mac (see auth_request).
+        self.auth_as_mac = False
+        self.url_bag = self._fetch_bag(self.base_headers())
+        client = self.anisette.client_info
+        if not self._bag_is_complete() and "<macOS;" not in client and "<Mac OS X;" not in client:
+            warn("Apple's URL bag for this client lacks URLs this script uses; asking as a Mac.")
+            self.url_bag = self._fetch_bag(self.mac_headers())
+
+    @staticmethod
+    def _fetch_bag(headers):
+        status, _, body = request("GET", GSA_URL_BAG, headers=headers)
         if status != 200:
             raise Fail("Could not reach Apple's GrandSlam service (HTTP %d)." % status)
-        self.url_bag = plistlib.loads(body)["urls"]
+        return plistlib.loads(body)["urls"]
+
+    def _bag_is_complete(self):
+        return (all(key in self.url_bag for key in GSA_BAG_KEYS)
+                and str(self.url_bag["gsService"]).startswith("https://gsa.apple.com/"))
+
+    def auth_request(self, method, url, extra_headers, plist=True, body=None):
+        """A request to a page under gsa.apple.com/auth, as the client the rest
+        of sign-in reports; once more as a Mac if that gets a bare 403 (no
+        serviceErrors), which is how these pages turned the Android phone
+        away. Returns (status, body)."""
+        while True:
+            headers = self.mac_headers(plist) if self.auth_as_mac else self.base_headers(plist)
+            headers.update(extra_headers)
+            status, _, response = request(method, url, headers=headers, body=body)
+            if status == 403 and not self.auth_as_mac and b"serviceErrors" not in (response or b""):
+                warn("%s turned this client away; asking as a Mac." % url)
+                self.auth_as_mac = True
+                continue
+            return status, response
 
     def base_headers(self, plist=True):
         headers = {}
@@ -850,12 +1027,18 @@ class GrandSlam:
         headers["X-Apple-App-Info"] = "com.apple.gs.xcode.auth"
         return headers
 
+    def mac_headers(self, plist=True):
+        """base_headers, saying the client is a Mac (see GSA_MAC_CLIENT_INFO)."""
+        headers = self.base_headers(plist)
+        headers["X-Mme-Client-Info"] = GSA_MAC_CLIENT_INFO
+        return headers
+
     def url(self, key):
         if key not in self.url_bag:
             raise Fail("Apple's URL bag has no '%s' entry." % key)
         return self.url_bag[key]
 
-    def plist_request(self, url, body, extra_headers=None):
+    def plist_request(self, url, body, extra_headers=None, check=True):
         headers = self.base_headers()
         headers.update(extra_headers or {})
         payload = plistlib.dumps(body, fmt=plistlib.FMT_XML)
@@ -865,7 +1048,7 @@ class GrandSlam:
         parsed = plistlib.loads(response)
         if "Response" not in parsed:
             raise Fail("Unexpected reply from Apple (no Response section).")
-        return check_gs_error(parsed["Response"])
+        return check_gs_error(parsed["Response"]) if check else parsed["Response"]
 
 
 def check_gs_error(response):
@@ -895,6 +1078,8 @@ class AppleAccount:
                 return
             if state == "device-2fa":
                 self._device_2fa(ask_code)
+            elif state == "device-2fa-sent":
+                self._device_2fa(ask_code, send=False)
             elif state == "sms-2fa":
                 self._sms_2fa(ask_code)
             else:
@@ -917,19 +1102,8 @@ class AppleAccount:
         # one-time password, but the pair belongs to a single SRP exchange —
         # isideload reuses it here and refreshing mid-handshake risks Apple
         # rejecting the second leg.
-        cpd = self.anisette.client_provided_data()
         srp = SRPClient()
-
-        first = self.gs.plist_request(self.gs.url("gsService"), {
-            "Header": {"Version": "1.0.1"},
-            "Request": {
-                "A2k": srp.a_pub,
-                "cpd": cpd,
-                "o": "init",
-                "ps": ["s2k", "s2k_fo"],
-                "u": self.email,
-            },
-        })
+        first, cpd = self._init(srp)
 
         password_key = srp_password_key(
             password, bytes(first["s"]), int(first["i"]), first["sp"]
@@ -956,14 +1130,52 @@ class AppleAccount:
 
         self.spd = srp.decrypt_spd(bytes(second["spd"]))
 
-        au = second.get("Status", {}).get("au")
+        status = second.get("Status", {})
+        au = status.get("au")
         if au == "trustedDeviceSecondaryAuth":
             return "device-2fa"
         if au == "secondaryAuth":
             return "sms-2fa"
+        if au is None and status.get("hsc") == 409:
+            # What an Android client gets: 409 (a second step is due) with no
+            # step named, and a code already pushed to the trusted devices.
+            return "device-2fa-sent"
         if au == "repair" or au is None:
             return "ok"
         return au
+
+    def _init(self, srp):
+        """SRP init. Returns the answer and the cpd the rest of the handshake
+        reuses.
+
+        Anisette servers on Apple's Windows ADI library (ani.jkcoxson.com,
+        win.ani.sidestore.io) get hsc 434, -22421 "This action could not be
+        completed. Try again." at a machine's first sign-in, with resync data
+        for the ADI library. Once the server has applied it, the same request
+        goes through, and later sign-ins need no resync."""
+        def send(cpd):
+            return self.gs.plist_request(self.gs.url("gsService"), {
+                "Header": {"Version": "1.0.1"},
+                "Request": {
+                    "A2k": srp.a_pub,
+                    "cpd": cpd,
+                    "o": "init",
+                    "ps": ["s2k", "s2k_fo"],
+                    "u": self.email,
+                },
+            }, check=False)
+
+        cpd = self.anisette.client_provided_data()
+        first = send(cpd)
+        status = first.get("Status", {})
+        sim = status.get("X-Apple-I-MD-DATA")
+        if status.get("hsc") == 434 and sim:
+            if isinstance(sim, bytes):
+                sim = base64.b64encode(sim).decode()
+            info("Apple asked the anisette server to resync; retrying.")
+            cpd = self.anisette.client_provided_data(sim)
+            first = send(cpd)
+        return check_gs_error(first), cpd
 
     def _identity_headers(self):
         headers = self.anisette.headers()
@@ -972,13 +1184,17 @@ class AppleAccount:
         headers["X-Apple-I-MD-RINFO"] = self.anisette.routing_info
         return headers
 
-    def _device_2fa(self, ask_code):
-        headers = self.gs.base_headers()
-        headers.update(self._identity_headers())
-        status, _, _ = request("GET", self.gs.url("trustedDeviceSecondaryAuth"), headers=headers)
-        if status >= 400:
-            raise Fail("Apple would not send a verification code (HTTP %d)." % status)
-        info("A verification code has been sent to your trusted devices.")
+    def _device_2fa(self, ask_code, send=True):
+        """Ask for the trusted-device code and hand it to Apple. With `send`
+        false Apple has pushed the code already, and says so in `sm`."""
+        if send:
+            status, _ = self.gs.auth_request("GET", self.gs.url("trustedDeviceSecondaryAuth"),
+                                             self._identity_headers())
+            if status >= 400:
+                raise Fail("Apple would not send a verification code (HTTP %d)." % status)
+            info("A verification code has been sent to your trusted devices.")
+        else:
+            info(self.spd.get("sm") or "A verification code has been sent to your trusted devices.")
 
         code = ask_code("Two-factor code")
         headers = self.gs.base_headers()
@@ -990,21 +1206,19 @@ class AppleAccount:
         check_gs_error(plistlib.loads(body))
 
     def _sms_2fa(self, ask_code):
-        headers = self.gs.base_headers(plist=False)
-        headers.update(self._identity_headers())
-        status, _, _ = request("GET", self.gs.url("secondaryAuth"), headers=headers)
+        status, _ = self.gs.auth_request("GET", self.gs.url("secondaryAuth"),
+                                         self._identity_headers(), plist=False)
         if status >= 400:
             raise Fail("Apple would not send an SMS code (HTTP %d)." % status)
         info("A verification code has been sent by SMS.")
 
         code = ask_code("SMS code")
-        headers = self.gs.base_headers(plist=False)
-        headers.update(self._identity_headers())
+        headers = self._identity_headers()
         headers["Content-Type"] = "application/json"
         headers["Accept"] = "application/json, text/javascript, */*; q=0.01"
-        status, _, body = request(
+        status, body = self.gs.auth_request(
             "POST", "https://gsa.apple.com/auth/verify/phone/securitycode",
-            headers=headers,
+            headers, plist=False,
             body=json.dumps({
                 "securityCode": {"code": code},
                 "phoneNumber": {"id": 1},
@@ -1052,7 +1266,7 @@ class AppleAccount:
         decrypted = aes_gcm_decrypt(
             session_key, blob[3:19], blob[19:-16], blob[:3], blob[-16:]
         )
-        token = plistlib.loads(decrypted)
+        token = loads_bare_plist(decrypted)
         if token.get("status-code") != 200:
             raise Fail("Apple refused the developer token (status %s)." % token.get("status-code"))
         return token["t"][app]["token"], adsid
@@ -1702,7 +1916,7 @@ def parse_args(argv):
         "email": os.environ.get("APPLE_ID"),
         "ipa": None,
         "beta": False,
-        "anisette": DEFAULT_ANISETTE,
+        "anisette": default_anisette(),
         "http_port": 8888,
         "https_port": 8443,
         "serve": True,
@@ -1743,9 +1957,43 @@ def parse_args(argv):
     return options
 
 
+def default_anisette():
+    """ANISETTE_URL if set; else the server the last run used; else the old
+    default for anyone with an anisette identity from before this script kept
+    one per library (they keep it, and the second factor Apple trusts it
+    with); else the new one."""
+    if os.environ.get("ANISETTE_URL"):
+        return os.environ["ANISETTE_URL"]
+    try:
+        with open(os.path.join(STORAGE, "anisette-servers.json")) as handle:
+            last = json.load(handle).get("last")
+        if last:
+            return last
+    except (OSError, ValueError, AttributeError):
+        pass
+    if os.path.exists(os.path.join(STORAGE, "anisette.json")):
+        return LEGACY_ANISETTE
+    return FALLBACK_ANISETTE
+
+
+def adi_library(url):
+    """The ADI library a server runs, "mac", "windows" or "android" (the
+    app's AnisetteServer.library, by host only)."""
+    host = urllib.parse.urlparse(url).hostname
+    if host in MAC_ADI_HOSTS:
+        return "mac"
+    if host in WINDOWS_ADI_HOSTS:
+        return "windows"
+    return "android"
+
+
 def anisette_candidates(preferred):
-    """The user's choice first, then the live community list, then the copy
-    baked in here."""
+    """The user's choice first, then the rest of its library unless that's
+    Android's, then the servers on Apple's Windows ADI library, then the rest
+    of the live community list and the copy baked in here, with the macOS-ADI
+    servers last: through them Apple asked an account with trusted devices
+    for a code by text and refused to send one (HTTP 403, 2026-10-16). As in
+    the app (AnisetteServer.candidates)."""
     urls = [preferred]
     try:
         status, _, body = request("GET", ANISETTE_LIST_URL,
@@ -1759,6 +2007,13 @@ def anisette_candidates(preferred):
         pass
     urls.extend(BUNDLED_ANISETTE)
 
+    rest = urls[1:]
+    own = adi_library(preferred)
+    urls = (urls[:1]
+            + ([u for u in rest if adi_library(u) == own] if own != "android" else [])
+            + [u for u in rest if adi_library(u) == "windows"]
+            + [u for u in rest if adi_library(u) != "mac"]
+            + rest)
     seen = set()
     unique = []
     for url in urls:
@@ -1783,20 +2038,16 @@ def connect_anisette(url_hint, state_path):
             version = anisette.detect()
             gs = GrandSlam(anisette)
 
-            if anisette.needs_provisioning():
-                info("Provisioning with %s (first run only)…" % url)
-                anisette.provision(gs)
-            try:
-                anisette.headers()
-            except Fail:
-                # A stored blob this server won't accept: throw it away and
-                # provision again before giving up on the server.
-                if anisette.version != 3 or not anisette.adi_pb:
-                    raise
-                warn("Stored anisette identity was rejected; provisioning again.")
-                anisette.forget_provisioning()
-                anisette.provision(gs)
-                anisette.headers()
+            if version == 3:
+                anisette.select_identity(gs)
+                try:
+                    anisette.headers()
+                except NotProvisioned:
+                    # The identity this server took before, which it no longer
+                    # takes: it has moved to another ADI library.
+                    warn("This server no longer takes its anisette identity; picking another.")
+                    anisette.select_identity(gs, rejected=anisette.identity)
+            info("Client info: %s" % anisette.client_info)
 
             ok("Anisette: %s (v%d)" % (url, version))
             return anisette, gs

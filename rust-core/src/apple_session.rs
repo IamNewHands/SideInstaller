@@ -58,16 +58,13 @@ impl SavedSession {
         }
     }
 
-    /// Unix time (seconds) when the token expires, if known. Apple doesn't
-    /// document the unit, so both milliseconds and seconds are handled. A token
-    /// without an expiry is tried anyway.
+    /// Unix time (seconds) when the token expires, if known: Apple's stated
+    /// expiry, else its duration from when the token was saved. A token
+    /// without either is tried anyway.
     fn expires_at(&self) -> Option<u64> {
-        match self.expiry {
-            e if e >= 100_000_000_000 => Some(e / 1000),
-            e if e >= 1_000_000_000 => Some(e),
-            _ if self.duration > 0 => Some(self.saved_at.saturating_add(self.duration)),
-            _ => None,
-        }
+        stated_expiry(self.expiry).or_else(|| {
+            (self.duration > 0).then(|| self.saved_at.saturating_add(self.duration))
+        })
     }
 
     fn usable_for(&self, apple_id: &str, now: u64) -> bool {
@@ -101,6 +98,16 @@ impl SavedSession {
             Some(_) => format!(" (expiry={}, duration={})", self.expiry, self.duration),
             None => " (Apple gave no expiry)".to_string(),
         }
+    }
+}
+
+/// An app token's `expiry` as Unix seconds, or None when Apple sent none.
+/// Apple doesn't document the unit, so both milliseconds and seconds are read.
+pub(crate) fn stated_expiry(expiry: u64) -> Option<u64> {
+    match expiry {
+        e if e >= 100_000_000_000 => Some(e / 1000),
+        e if e >= 1_000_000_000 => Some(e),
+        _ => None,
     }
 }
 
@@ -143,6 +150,15 @@ fn is_transient(error: &str) -> bool {
         || e.contains("timed out")
         || e.contains("(429 ")
         || e.contains("server error (5")
+}
+
+/// True for portal errors about the Apple Account itself, which a new token
+/// doesn't change: 1102 (its owner's age) and 2160 (its email address isn't
+/// verified). They're returned to the caller as-is and the saved session is
+/// kept, since signing in again only meets the same refusal.
+fn is_account_refusal(error: &str) -> bool {
+    let e = error.to_lowercase();
+    e.contains("developer error 1102") || e.contains("developer error 2160")
 }
 
 fn first_line(text: &str) -> &str {
@@ -190,6 +206,7 @@ where
                 );
                 return Ok(opened);
             }
+            Err(e) if is_account_refusal(&e) => return Err(format!("list teams: {e}")),
             Err(e) => tracing::info!(
                 "{label}: couldn't reuse the saved session straight away ({}); checking it with a full sign-in client",
                 first_line(&e)
@@ -230,7 +247,7 @@ where
                 }
                 Err(e) => {
                     let text = report_text(&e);
-                    if is_transient(&text) {
+                    if is_transient(&text) || is_account_refusal(&text) {
                         return Err(format!("developer session: {text}"));
                     }
                     tracing::info!(
@@ -346,6 +363,14 @@ mod tests {
     }
 
     #[test]
+    fn a_stated_expiry_is_read_and_a_missing_one_is_none() {
+        assert_eq!(stated_expiry(1_789_400_000_000), Some(1_789_400_000));
+        assert_eq!(stated_expiry(1_789_400_000), Some(1_789_400_000));
+        assert_eq!(stated_expiry(0), None);
+        assert_eq!(stated_expiry(3_600), None);
+    }
+
+    #[test]
     fn falls_back_to_duration_then_to_trying_the_token() {
         assert_eq!(saved(0, 3_600, NOW).expires_at(), Some(NOW + 3_600));
         assert_eq!(saved(0, 0, NOW).expires_at(), None);
@@ -411,6 +436,22 @@ mod tests {
             " ● Failed to extract developer request result",
         ] {
             assert!(!is_transient(rejected), "{rejected}");
+        }
+    }
+
+    #[test]
+    fn account_refusals_keep_the_token() {
+        for refusal in [
+            " ● Failed to list developer teams\n ├ vendor/isideload/src/dev/teams.rs:26\n │\n ● Developer error 2160: Please verify the email address associated with your Apple Account. Please visit \n │ https://account.apple.com.",
+            " ● Failed to list developer teams\n ● Developer error 1102: (Apple's age refusal)",
+        ] {
+            assert!(is_account_refusal(refusal), "{refusal}");
+        }
+        for other in [
+            " ● Developer error 1100: Your session has expired. Please log in.",
+            " ● Developer request failed\n ● HTTP status client error (401 Unauthorized) for url (https://developerservices2.apple.com/)",
+        ] {
+            assert!(!is_account_refusal(other), "{other}");
         }
     }
 

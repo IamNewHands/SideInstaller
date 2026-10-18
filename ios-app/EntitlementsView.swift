@@ -241,10 +241,14 @@ final class EntitlementsManager: ObservableObject {
         let dir = storageDir
         engine.twoFactorWasCancelled = false
         var lastError = "no anisette servers configured"
-        var appleRefusals = 0
+        var appleRefusals = AnisetteServer.AppleRefusals(servers: engine.anisetteServers)
         var appleUnreachable = 0
 
         for (idx, ani) in servers.enumerated() {
+            if appleRefusals.rulesOut(ani) {
+                engine.log("Entitlements: skipping anisette \(idx + 1)/\(servers.count): Apple has refused the device sign-in reports through it.")
+                continue
+            }
             do {
                 let summary = try await onQueue {
                     try self.performSignIn(id: id, pw: pw, ani: ani, dir: dir)
@@ -261,6 +265,9 @@ final class EntitlementsManager: ObservableObject {
                 if Engine.isAccountLocked(lastError) {
                     throw EngineError.accountLocked
                 }
+                if Engine.isEmailUnverifiedError(lastError) {
+                    throw EngineError.emailUnverified
+                }
                 if Engine.isCredentialError(lastError) {
                     throw EngineError.message(Engine.credentialErrorMessage)
                 }
@@ -269,11 +276,12 @@ final class EntitlementsManager: ObservableObject {
                     engine.log("Entitlements: Apple is rate-limiting sign-in (HTTP 429) — stopping.")
                     throw EngineError.message(Engine.appleRateLimitMessage)
                 }
-                // Apple refusing the request fails the same on every server.
+                // Apple refuses a reported device through every server alike;
+                // see `AnisetteServer.AppleRefusals`.
                 if Engine.isAppleServiceRefusal(lastError) {
-                    appleRefusals += 1
-                    if appleRefusals >= 2 {
-                        engine.log("Entitlements: Apple's sign-in server refused \(appleRefusals) attempts with HTTP 503 — stopping.")
+                    appleRefusals.record(ani)
+                    if appleRefusals.endsSignIn(remaining: servers[(idx + 1)...]) {
+                        engine.log("Entitlements: Apple's sign-in server refused \(appleRefusals.count) attempts with HTTP 503 — stopping.")
                         throw EngineError.message(Engine.appleServiceRefusalMessage)
                     }
                 }
@@ -361,14 +369,9 @@ final class EntitlementsManager: ObservableObject {
 
     // MARK: Helpers
 
+    /// Anisette addresses to try, in the engine's order.
     private func anisetteCandidates() -> [String] {
-        var seen = Set<String>()
-        var out: [String] = []
-        for addr in [engine.anisetteURL] + engine.anisetteServers.map(\.address) {
-            let a = addr.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !a.isEmpty, seen.insert(a).inserted { out.append(a) }
-        }
-        return out
+        engine.anisetteCandidates()
     }
 
     private var storageDir: String { PrivateStore.isideload.path }
