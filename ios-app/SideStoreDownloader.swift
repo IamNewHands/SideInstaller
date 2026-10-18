@@ -71,9 +71,6 @@ enum InstallSource: String, CaseIterable, Identifiable {
     }
 
     /// GitHub "owner/repo" whose release holds the IPA.
-    ///
-    /// TEMPORARY: LiveContainer/LiveContainer is down, so LiveContainer comes
-    /// from a mirror. Revert this and `servedChannel` once upstream is back.
     var repo: String? {
         switch self {
         case .sideStore:     return "SideStore/SideStore"
@@ -107,7 +104,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
     func releaseAPI(_ channel: ReleaseChannel) -> URL? {
         guard let repo else { return nil }
         let base = "https://api.github.com/repos/\(repo)/releases"
-        switch servedChannel(channel) {
+        switch channel {
         case .stable:  return URL(string: "\(base)/latest")!
         case .nightly: return URL(string: "\(base)/tags/nightly")!
         }
@@ -150,7 +147,7 @@ enum InstallSource: String, CaseIterable, Identifiable {
     func downloadURL(_ channel: ReleaseChannel) -> URL? {
         guard let repo, let assetFileName else { return nil }
         let base = "https://github.com/\(repo)/releases"
-        switch servedChannel(channel) {
+        switch channel {
         case .stable:  return URL(string: "\(base)/latest/download/\(assetFileName)")
         // The nightly tag is fixed, so nothing needs resolving.
         case .nightly: return URL(string: "\(base)/download/nightly/\(assetFileName)")
@@ -278,16 +275,6 @@ enum InstallSource: String, CaseIterable, Identifiable {
         case .sideStore:        return .standalone
         case .liveContainer:    return .liveContainer
         case .madeira, .custom: return nil
-        }
-    }
-
-    /// Where SideStore lives in the installed app. Nil for a custom IPA, which
-    /// only the signed bundle id can identify.
-    var sideStoreHome: SideStoreHome? {
-        switch self {
-        case .sideStore:     return .standalone
-        case .liveContainer: return .liveContainer
-        case .custom:        return nil
         }
     }
 
@@ -873,7 +860,7 @@ enum SideStoreDownloader {
 
         // Newest first, which is the order GitHub answers in.
         for release in releases {
-            if source.servedChannel(channel) == .stable, release.prerelease == true { continue }
+            if channel == .stable, release.prerelease == true { continue }
             guard let asset = source.selectAsset(from: release.assets),
                   let assetURL = URL(string: asset.browser_download_url) else { continue }
             // Save under the release's actual channel, not the requested one.

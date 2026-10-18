@@ -502,12 +502,6 @@ struct ContentView: View {
         return engine.selectedVersion.map { "\(name) \($0.title)" } ?? name
     }
 
-    /// The build the Install button names, with its version when one is picked.
-    private var installTargetName: String {
-        let name = engine.installSource.shortName
-        return engine.selectedVersion.map { "\(name) \($0.title)" } ?? name
-    }
-
     // MARK: iOS version requirement
 
     /// Shown when iOS is below the minimum supported version.
